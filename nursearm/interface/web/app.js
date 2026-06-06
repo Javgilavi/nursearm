@@ -106,9 +106,8 @@ window.addEventListener("resize", applyLayoutSizes);
 // No JS polling loop needed.
 
 function startCameras() {
-  cameraFrames.forEach((img) => {
-    img.src = "/stream";
-  });
+  cameraFrames[0].src = "/stream/palm";
+  cameraFrames[1].src = "/stream";
 }
 
 // ── Chat ──────────────────────────────────────────────────────────────────────
@@ -284,6 +283,29 @@ mobileTabBtns.forEach((btn) => {
   });
 });
 
+// ── Palm detection badge ──────────────────────────────────────────────────────
+
+const palmBadge = document.getElementById("palm-badge");
+
+async function pollPalmStatus() {
+  try {
+    const r = await fetch("/palm/status");
+    const d = await r.json();
+    if (d.detected) {
+      const hand = d.handedness || "hand";
+      const state = d.is_open ? "open" : "closed";
+      const up = d.palm_up ? `↑ palm-up ${Math.round(d.palm_up_confidence * 100)}%` : "palm-down";
+      palmBadge.textContent = `✋ ${hand}  ${state}  ${up}`;
+      palmBadge.className = "palm-badge palm-badge-hand";
+    } else {
+      palmBadge.textContent = "no hand";
+      palmBadge.className = "palm-badge palm-badge-none";
+    }
+  } catch {
+    palmBadge.textContent = "";
+  }
+}
+
 // ── Boot ──────────────────────────────────────────────────────────────────────
 
 async function loadRemoteUrl() {
@@ -310,4 +332,6 @@ window.addEventListener("load", () => {
     chatInput.focus();
   }
   loadRemoteUrl();
+  pollPalmStatus();
+  setInterval(pollPalmStatus, 1000);
 });

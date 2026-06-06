@@ -84,6 +84,9 @@ class AppState:
         self._ws_clients: set[WebSocket] = set()
         self._latest_scene: SceneObservation | None = None
         self._latest_jpg: bytes = self._encode_jpg(_BLANK_FRAME)
+        self._latest_palm_jpg: bytes = self._encode_jpg(_BLANK_FRAME)
+        self._latest_palm_result: dict = {"detected": False}
+        self._palm_log_tick: int = 0
         self._camera_task: asyncio.Task | None = None
         self._whisper: WhisperModel | None = None
         self._whisper_lock = asyncio.Lock()
@@ -110,22 +113,62 @@ class AppState:
         """Continuously capture from the camera and store the latest JPEG."""
         while True:
             try:
-                jpg = await asyncio.to_thread(self._capture_jpg)
-                self._latest_jpg = jpg
+                raw_jpg, palm_jpg = await asyncio.to_thread(self._capture_both_jpg)
+                self._latest_jpg = raw_jpg
+                self._latest_palm_jpg = palm_jpg
             except Exception as exc:
                 logger.debug("camera capture error: %s", exc)
             await asyncio.sleep(1 / 30)  # target 30 fps capture
 
-    def _capture_jpg(self) -> bytes:
+    def _capture_both_jpg(self) -> tuple[bytes, bytes]:
+        """Capture one frame and return (raw_jpg, palm_overlay_jpg)."""
         try:
-            color, _ = self.perception.frames()
+            color, depth = self.perception.frames()
         except Exception:
-            color = None
+            color, depth = None, None
         if color is None or color.size == 0:
-            color = _BLANK_FRAME
+            color = _BLANK_FRAME.copy()
+        if depth is None or not isinstance(depth, np.ndarray) or depth.size == 0:
+            depth = np.zeros(color.shape[:2], dtype=np.float32)
         if self.perception.mock and not self.perception.has_real_camera:
             color = self._make_mock_frame(color)
-        return self._encode_jpg(color)
+        raw_jpg = self._encode_jpg(color)
+        palm_jpg = self._encode_jpg(self._draw_palm(color, depth))
+        return raw_jpg, palm_jpg
+
+    def _draw_palm(self, color: np.ndarray, depth: np.ndarray) -> np.ndarray:
+        """Run palm detection, log result every ~2 s, return annotated frame."""
+        from nursearm.perception import hands
+        self._palm_log_tick = (self._palm_log_tick + 1) % 60  # log every 60 frames ≈ 2 s
+        should_log = self._palm_log_tick == 0
+        try:
+            debug = hands.analyze(self.perception, color=color, depth=depth)
+            if debug is not None:
+                self._latest_palm_result = {
+                    "detected": True,
+                    "handedness": debug.handedness,
+                    "is_open": debug.is_open,
+                    "openness_score": round(float(debug.openness_score), 2),
+                    "palm_up": debug.palm_up,
+                    "palm_up_confidence": round(float(debug.palm_up_confidence), 2),
+                }
+                if should_log:
+                    logger.info(
+                        "Palm ✋ %s | %s | palm-up: %s (%.0f%%)",
+                        debug.handedness or "?",
+                        "open" if debug.is_open else "closed",
+                        "yes" if debug.palm_up else "no",
+                        debug.palm_up_confidence * 100,
+                    )
+                return hands.draw_debug(color.copy(), debug)
+            else:
+                self._latest_palm_result = {"detected": False}
+                if should_log:
+                    logger.info("Palm: no hand in frame")
+        except Exception as exc:
+            logger.warning("Palm detection error: %s", exc)
+            self._latest_palm_result = {"detected": False, "error": str(exc)}
+        return color.copy()
 
     @staticmethod
     def _encode_jpg(frame: np.ndarray) -> bytes:
@@ -373,10 +416,38 @@ async def stream_view() -> StreamingResponse:
     )
 
 
+@app.get("/stream/palm")
+async def palm_stream_view() -> StreamingResponse:
+    """MJPEG stream with palm-detection overlay (camera 1)."""
+    async def generate():
+        while True:
+            jpg = state._latest_palm_jpg
+            if jpg:
+                yield (
+                    b"--frame\r\n"
+                    b"Content-Type: image/jpeg\r\n\r\n"
+                    + jpg
+                    + b"\r\n"
+                )
+            await asyncio.sleep(1 / 25)
+
+    return StreamingResponse(
+        generate(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+        headers={"Cache-Control": "no-cache, no-store"},
+    )
+
+
 @app.get("/frame")
 async def frame_view() -> Response:
     """Single latest JPEG frame (for snapshot use)."""
     return Response(content=state._latest_jpg, media_type="image/jpeg")
+
+
+@app.get("/palm/status")
+async def palm_status() -> dict[str, Any]:
+    """Latest palm detection result — polled by the UI badge."""
+    return state._latest_palm_result
 
 
 @app.post("/transcribe")

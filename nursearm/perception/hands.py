@@ -27,6 +27,15 @@ PINKY_TIP = 20
 FINGER_MCPS = (INDEX_MCP, MIDDLE_MCP, RING_MCP, PINKY_MCP)
 FINGER_TIPS = (THUMB_TIP, INDEX_TIP, MIDDLE_TIP, RING_TIP, PINKY_TIP)
 
+_HAND_BONES = [
+    (0, 1), (1, 2), (2, 3), (3, 4),
+    (0, 5), (5, 6), (6, 7), (7, 8),
+    (0, 9), (9, 10), (10, 11), (11, 12),
+    (0, 13), (13, 14), (14, 15), (15, 16),
+    (0, 17), (17, 18), (18, 19), (19, 20),
+    (5, 9), (9, 13), (13, 17),
+]
+
 _MP_HANDS = None
 _MP_HANDS_KIND = None
 _TASK_MODEL_PATH = Path(__file__).resolve().parents[2] / "data" / "models" / "hand_landmarker.task"
@@ -305,9 +314,31 @@ def _heuristic_palm_up(
 
 def draw_debug(frame: np.ndarray, debug: HandDebug) -> np.ndarray:
     rendered = frame.copy()
-    for px, py in debug.landmarks_px:
-        cv2.circle(rendered, (int(px), int(py)), 3, (40, 220, 140), -1)
-    cv2.circle(rendered, debug.palm_pixel, 8, (0, 180, 255), 2)
-    label = f"{debug.handedness or 'hand'} open={debug.is_open} palm_up={debug.palm_up} conf={debug.palm_up_confidence:.2f}"
-    cv2.putText(rendered, label, (10, rendered.shape[0] - 14), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 180, 255), 2)
+    pts = debug.landmarks_px
+
+    # skeleton bones
+    for a, b in _HAND_BONES:
+        cv2.line(rendered, (int(pts[a][0]), int(pts[a][1])), (int(pts[b][0]), int(pts[b][1])),
+                 (255, 255, 255), 2, cv2.LINE_AA)
+
+    # joint dots
+    for px, py in pts:
+        cv2.circle(rendered, (int(px), int(py)), 5, (40, 220, 140), -1, cv2.LINE_AA)
+        cv2.circle(rendered, (int(px), int(py)), 5, (255, 255, 255), 1, cv2.LINE_AA)
+
+    # palm centroid
+    cv2.circle(rendered, debug.palm_pixel, 10, (0, 220, 255), -1, cv2.LINE_AA)
+    cv2.circle(rendered, debug.palm_pixel, 12, (255, 255, 255), 2, cv2.LINE_AA)
+
+    # text with dark background
+    hand_str = debug.handedness or "hand"
+    state_str = "open" if debug.is_open else "closed"
+    up_str = f"palm-up: {'yes' if debug.palm_up else 'no'} ({debug.palm_up_confidence:.0%})"
+    label = f"{hand_str}  {state_str}  {up_str}"
+    font, scale, thick = cv2.FONT_HERSHEY_SIMPLEX, 0.58, 1
+    (tw, th), baseline = cv2.getTextSize(label, font, scale, thick)
+    y = rendered.shape[0] - 10
+    cv2.rectangle(rendered, (8, y - th - baseline - 4), (12 + tw, y + 4), (0, 0, 0), -1)
+    cv2.putText(rendered, label, (10, y - baseline), font, scale, (40, 220, 140), thick, cv2.LINE_AA)
+
     return rendered

@@ -329,6 +329,35 @@ h2 {
   object-fit: cover;
 }
 
+.palm-badge {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 14px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-family: ui-monospace, "Cascadia Code", "SF Mono", monospace;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
+  backdrop-filter: blur(6px);
+  transition: opacity 0.3s, background 0.3s;
+  opacity: 0;
+}
+.palm-badge:not(:empty) { opacity: 1; }
+.palm-badge-hand {
+  background: rgba(0, 0, 0, 0.55);
+  color: #28dc8c;
+  border: 1px solid rgba(40, 220, 140, 0.45);
+}
+.palm-badge-none {
+  background: rgba(0, 0, 0, 0.45);
+  color: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
 .chat-panel {
   min-width: 0;
   padding-bottom: 16px;

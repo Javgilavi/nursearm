@@ -52,13 +52,14 @@
               <div class="panel-top">
                 <div>
                   <p class="panel-kicker">Camera 1</p>
-                  <h2>Overhead view</h2>
+                  <h2>Palm detection</h2>
                 </div>
                 <span class="live-badge">Live</span>
               </div>
-              <p class="panel-note">Primary workspace and object-detection feed.</p>
+              <p class="panel-note">Hand landmarks, open/closed state, palm-up classification.</p>
               <div class="camera-stage">
-                <img id="camera-frame-1" class="camera-frame" alt="Camera 1 view" src="/stream" />
+                <img id="camera-frame-1" class="camera-frame" alt="Camera 1 — palm detection" src="/stream/palm" />
+                <div id="palm-badge" class="palm-badge" aria-live="polite"></div>
               </div>
             </section>
 
