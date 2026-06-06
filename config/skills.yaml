@@ -2,6 +2,30 @@
 # language-conditioned policy using prompt/task and policy_path.
 
 skills:
+  dummy_skill_1:
+    type: primitive
+    class: nursearm.skills.dummy.DummySkill1
+    description: >
+      Safe integration-test skill for requests to inspect, check, assess, or observe
+      the environment. It does not use the camera and never moves the robot.
+    enabled: true
+
+  dummy_skill_2:
+    type: primitive
+    class: nursearm.skills.dummy.DummySkill2
+    description: >
+      Safe integration-test skill for requests to prepare, fetch, position, or get
+      ready to provide assistance. It never moves the robot.
+    enabled: true
+
+  dummy_skill_3:
+    type: primitive
+    class: nursearm.skills.dummy.DummySkill3
+    description: >
+      Safe integration-test skill for requests to finish an assistance sequence,
+      hand something over, or confirm completion. It never moves the robot.
+    enabled: true
+
   move_up:
     type: primitive
     class: nursearm.skills.primitives.MoveUp
