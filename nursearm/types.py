@@ -44,6 +44,8 @@ class SceneObservation:
     mouth_point: Point3D | None = None
     hand_open: bool | None = None
     palm_point: Point3D | None = None
+    palm_up: bool | None = None
+    palm_up_confidence: float | None = None
     gaze_target: DetectedObject | None = None
     # Optional thumbnail (BGR) for the judge / UI to inspect. Not serialized to JSON.
     frame: np.ndarray | None = None
@@ -59,6 +61,8 @@ class SceneObservation:
             "mouth_point": self.mouth_point,
             "hand_open": self.hand_open,
             "palm_point": self.palm_point,
+            "palm_up": self.palm_up,
+            "palm_up_confidence": round(self.palm_up_confidence, 3) if self.palm_up_confidence is not None else None,
             "gaze_target": self.gaze_target.label if self.gaze_target else None,
         }
 

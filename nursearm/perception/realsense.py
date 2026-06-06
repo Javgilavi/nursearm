@@ -16,8 +16,10 @@ landmark extraction; this class wires them together into a SceneObservation.
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass
 
+import cv2
 import numpy as np
 
 from nursearm import config
@@ -35,38 +37,33 @@ class FaceObservation:
 class HandObservation:
     is_open: bool
     palm_point: Point3D | None
+    palm_up: bool = False
+    palm_up_confidence: float = 0.0
 
 
 class Perception:
     """Wraps a RealSense pipeline and the landmark extractors.
 
     For development without hardware, construct with ``mock=True`` to return empty/
-    canned observations so the judge loop and UI can run on a laptop.  When mock=True,
-    a laptop webcam (index 0) is opened automatically if one is available so the camera
-    tile in the UI shows a real feed rather than a synthetic placeholder.
+    canned observations so the judge loop and UI can run on a laptop. When
+    ``mock=True``, a laptop webcam is opened automatically if one is available so the
+    UI can show a real feed rather than a synthetic placeholder.
     """
 
     def __init__(self, mock: bool = False) -> None:
         self.mock = mock
+        self.source = os.getenv("NURSEARM_CAMERA_SOURCE", "realsense").strip().lower()
+        self.webcam_index = int(os.getenv("NURSEARM_WEBCAM_INDEX", "0"))
         self._pipeline = None
         self._align = None
         self._intrinsics = None
-        self._cap = None  # cv2.VideoCapture for laptop webcam in mock mode
+        self._video_capture: cv2.VideoCapture | None = None
+        self._video_capture_mode: str | None = None
         self._hand_eye = np.array(config.robot_config().get("hand_eye_transform", np.eye(4).tolist()))
-        if not mock:
+        if not mock and self.source == "realsense":
             self._start()
         else:
-            self._start_webcam()
-
-    def _start_webcam(self) -> None:
-        import cv2
-        cap = cv2.VideoCapture(0)
-        if cap.isOpened():
-            self._cap = cap
-            logger.info("Laptop webcam (index 0) opened for mock-mode camera feed.")
-        else:
-            cap.release()
-            logger.info("No webcam found on index 0; using synthetic frames.")
+            self._start_webcam(allow_failure=mock)
 
     def _start(self) -> None:
         import pyrealsense2 as rs  # lazy import — only needed with real hardware
@@ -82,22 +79,48 @@ class Perception:
         )
         logger.info("RealSense started (color+depth, aligned).")
 
+    def _start_webcam(self, *, allow_failure: bool = False) -> None:
+        cap = cv2.VideoCapture(self.webcam_index)
+        if not cap.isOpened():
+            cap.release()
+            if allow_failure:
+                logger.info("No webcam found on index %s; using synthetic frames.", self.webcam_index)
+                return
+            raise RuntimeError(f"failed to open webcam index {self.webcam_index}")
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        cap.set(cv2.CAP_PROP_FPS, 30)
+        self._video_capture = cap
+        self._video_capture_mode = "mock" if self.mock else "webcam"
+        logger.info("Webcam started (index=%s, mode=%s).", self.webcam_index, self._video_capture_mode)
+
     @property
     def has_real_camera(self) -> bool:
-        """True when we have an open webcam (mock mode) or RealSense (real mode)."""
-        if self.mock:
-            return self._cap is not None and self._cap.isOpened()
+        """True when we have an open webcam or RealSense device."""
+        if self.mock or self.source == "webcam":
+            return self._video_capture is not None and self._video_capture.isOpened()
         return self._pipeline is not None
 
     # -- raw capture -------------------------------------------------------------
     def frames(self) -> tuple[np.ndarray, np.ndarray]:
         """Return (color_bgr, depth_m) with depth aligned to color."""
         if self.mock:
-            if self._cap is not None and self._cap.isOpened():
-                ok, frame = self._cap.read()
+            if self._video_capture is not None and self._video_capture.isOpened():
+                ok, frame = self._video_capture.read()
                 if ok:
                     return frame, np.zeros((frame.shape[0], frame.shape[1]), np.float32)
             return np.zeros((480, 640, 3), np.uint8), np.zeros((480, 640), np.float32)
+
+        if self.source == "webcam":
+            if self._video_capture is None:
+                self._start_webcam(allow_failure=False)
+            assert self._video_capture is not None
+            ok, color = self._video_capture.read()
+            if not ok or color is None:
+                raise RuntimeError(f"failed to read webcam frame from index {self.webcam_index}")
+            depth = np.zeros(color.shape[:2], np.float32)
+            return color, depth
+
         import pyrealsense2 as rs  # noqa: F401
 
         frames = self._align.process(self._pipeline.wait_for_frames())
@@ -130,11 +153,12 @@ class Perception:
             mouth_point=face.mouth_point if face else None,
             hand_open=hand.is_open if hand else None,
             palm_point=hand.palm_point if hand else None,
+            palm_up=hand.palm_up if hand else None,
+            palm_up_confidence=hand.palm_up_confidence if hand else None,
             gaze_target=gaze,
             frame=color,
         )
 
-    # The following delegate to the sub-modules. Imported lazily to keep this file light.
     def face(self) -> FaceObservation | None:
         from nursearm.perception import face as face_mod
 
@@ -158,6 +182,7 @@ class Perception:
     def close(self) -> None:
         if self._pipeline is not None:
             self._pipeline.stop()
-        if self._cap is not None:
-            self._cap.release()
-            self._cap = None
+        if self._video_capture is not None:
+            self._video_capture.release()
+            self._video_capture = None
+            self._video_capture_mode = None

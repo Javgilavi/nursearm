@@ -238,6 +238,40 @@ python scripts/train_skill.py  dispense_pills --steps 60000
 NURSEARM_MOCK=0 uvicorn nursearm.interface.server:app
 ```
 
+For quick laptop-only testing, you can use the built-in webcam instead of the Intel
+RealSense:
+
+```bash
+NURSEARM_MOCK=0 NURSEARM_CAMERA_SOURCE=webcam NURSEARM_WEBCAM_INDEX=0 python scripts/test_perception.py
+```
+
+This webcam mode is RGB-only. It is good for validating hand detection and `palm_up`,
+but not for any task that depends on reliable 3D palm position.
+
+### Train palm-up hand detection for the Intel RealSense
+
+The repo now includes a lightweight AI pipeline for `palm_up / not_palm_up`:
+MediaPipe extracts the 21 hand landmarks, and a small classifier is trained over the
+3D hand geometry. This is the right level of model for this task: fast, cheap to label,
+and easy to deploy in a robotics loop.
+
+```bash
+# 1) collect labeled examples with the RealSense
+python scripts/collect_palm_up_dataset.py
+#    press `u` when the visible hand is palm-up
+#    press `n` for any other orientation
+
+# 2) train the classifier
+python scripts/train_palm_up_model.py
+
+# 3) verify live inference
+python scripts/test_perception.py
+```
+
+The trained model is written to `data/models/palm_up_model.json`. At runtime,
+`perception/hands.py` will load it automatically if it exists; otherwise it falls back
+to a simple geometric heuristic based on the 3D palm normal.
+
 ---
 
 ## Repository guide

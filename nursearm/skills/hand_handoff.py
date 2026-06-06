@@ -2,7 +2,7 @@
 
 Flow:
   1. perception.hands() -> open/closed + 3D palm point.
-  2. only proceed if the hand is OPEN and stable.
+  2. only proceed if the hand is OPEN, palm-up, and stable.
   3. servo to a point just above the palm, release the gripper, retract.
   4. verify the object left the gripper.
 
@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from nursearm.robot.controller import RobotController
 
 PALM_STANDOFF_M = 0.03
+PALM_UP_CONFIDENCE_MIN = 0.6
 
 
 class HandHandoff(VLASkill):
@@ -29,6 +30,12 @@ class HandHandoff(VLASkill):
         hands = perception.hands()
         if not hands or not hands.is_open or hands.palm_point is None:
             return SkillResult(False, 0.0, note="no open hand detected; ask the person to open their hand")
+        if not hands.palm_up or hands.palm_up_confidence < PALM_UP_CONFIDENCE_MIN:
+            return SkillResult(
+                False,
+                hands.palm_up_confidence,
+                note="open hand detected, but the palm is not clearly facing upward",
+            )
 
         robot.servo_to(hands.palm_point, standoff_m=PALM_STANDOFF_M, track=lambda: _palm(perception))
         robot.release()  # open gripper to hand over
