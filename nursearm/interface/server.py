@@ -39,11 +39,14 @@ if TYPE_CHECKING:
 
 from nursearm.audit.log import AuditLog
 from nursearm.mcp.client import NurseArmMCPClient
+from nursearm.orchestrator.claude_agent import ClaudeMCPAgent, ClaudeUnavailableError
 from nursearm.orchestrator.ollama_agent import OllamaMCPAgent, OllamaUnavailableError
 from nursearm.orchestrator.skill_registry import SkillRegistry
 from nursearm.perception.realsense import Perception
 from nursearm.robot.controller import RobotController
 from nursearm.types import SceneObservation
+
+AGENT_BACKEND = os.getenv("AGENT_BACKEND", "ollama").lower()  # "ollama" | "claude"
 
 class _NoiseFilter(logging.Filter):
     """Drop repetitive 404s from external tools polling our server."""
@@ -79,7 +82,7 @@ class AppState:
         self.perception = Perception(mock=MOCK)
         self.skills = SkillRegistry()
         self.mcp = NurseArmMCPClient()
-        self.agent: OllamaMCPAgent | None = None
+        self.agent: OllamaMCPAgent | ClaudeMCPAgent | None = None
         self.loop: asyncio.AbstractEventLoop | None = None
         self._ws_clients: set[WebSocket] = set()
         self._latest_scene: SceneObservation | None = None
@@ -94,7 +97,12 @@ class AppState:
 
     async def start(self) -> None:
         await self.mcp.connect()
-        self.agent = OllamaMCPAgent(self.mcp, audit=self.audit)
+        if AGENT_BACKEND == "claude":
+            self.agent = ClaudeMCPAgent(self.mcp, audit=self.audit)
+            logger.info("Agent backend: Claude (%s)", os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6"))
+        else:
+            self.agent = OllamaMCPAgent(self.mcp, audit=self.audit)
+            logger.info("Agent backend: Ollama")
         self._camera_task = asyncio.create_task(self._camera_loop())
         asyncio.create_task(self._preload_whisper())
 
@@ -336,7 +344,8 @@ def _ensure_ngrok(port: int = 8000) -> str | None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global state, _ngrok_url
-    await asyncio.to_thread(_ensure_ollama)
+    if AGENT_BACKEND != "claude":
+        await asyncio.to_thread(_ensure_ollama)
     _ngrok_url = await asyncio.to_thread(_ensure_ngrok)
     if _ngrok_url:
         logger.info("=" * 56)
@@ -466,7 +475,7 @@ async def transcribe(audio: UploadFile = File(...)) -> dict[str, str]:
 async def chat(msg: ChatIn) -> dict[str, str]:
     try:
         reply = await state.agent.handle(msg.text)
-    except OllamaUnavailableError as exc:
+    except (OllamaUnavailableError, ClaudeUnavailableError) as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return {"reply": reply}
 

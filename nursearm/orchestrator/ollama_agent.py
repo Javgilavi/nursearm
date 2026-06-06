@@ -15,7 +15,8 @@ from nursearm.mcp.client import NurseArmMCPClient
 DEFAULT_MODEL = "qwen3:4b"
 DEFAULT_URL = "http://127.0.0.1:11434"
 MAX_TURNS = 12
-SYSTEM_PROMPT = """You are the NurseArm task-level assistant.
+SYSTEM_PROMPT = """/no_think
+You are the NurseArm task-level assistant.
 Use the available tools when a request requires a NurseArm capability.
 Select only tools relevant to the user's request.
 Never claim an action succeeded until its tool result reports success.

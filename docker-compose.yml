@@ -1,0 +1,20 @@
+services:
+  openclaw:
+    build: ./bot
+    container_name: nursearm-openclaw
+    restart: unless-stopped
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - NURSEARM_URL=http://host.docker.internal:8000
+    # Linux: make the host machine reachable as host.docker.internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # Persistent state (conversation history, pairing approvals)
+    volumes:
+      - openclaw-state:/root/.openclaw/data
+    # No exposed ports — OpenClaw is outbound only (polls Telegram)
+    # No access to host filesystem, no privileged mode
+
+volumes:
+  openclaw-state:
