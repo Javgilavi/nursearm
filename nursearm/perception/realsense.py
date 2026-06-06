@@ -80,7 +80,8 @@ class Perception:
         logger.info("RealSense started (color+depth, aligned).")
 
     def _start_webcam(self, *, allow_failure: bool = False) -> None:
-        cap = cv2.VideoCapture(self.webcam_index)
+        # Use explicit V4L2 backend on Linux for reliable RealSense access
+        cap = cv2.VideoCapture(self.webcam_index, cv2.CAP_V4L2)
         if not cap.isOpened():
             cap.release()
             if allow_failure:
@@ -90,6 +91,10 @@ class Perception:
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
         cap.set(cv2.CAP_PROP_FPS, 30)
+        # Discard ~30 frames so RealSense auto-exposure settles before we stream
+        logger.info("Warming up camera %s (discarding 30 frames for auto-exposure)…", self.webcam_index)
+        for _ in range(30):
+            cap.grab()
         self._video_capture = cap
         self._video_capture_mode = "mock" if self.mock else "webcam"
         logger.info("Webcam started (index=%s, mode=%s).", self.webcam_index, self._video_capture_mode)

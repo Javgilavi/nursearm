@@ -101,13 +101,13 @@ cameraSplit.addEventListener("pointerdown", (event) => startResize("horizontal",
 layoutSplit.addEventListener("pointerdown", (event) => startResize("vertical", event));
 window.addEventListener("resize", applyLayoutSizes);
 
-// ── Camera ────────────────────────────────────────────────────────────────────
-// Point both panels at the MJPEG stream — the browser handles it natively.
-// No JS polling loop needed.
+// ── Cameras ───────────────────────────────────────────────────────────────────
+// Camera 1: RealSense top camera via /stream/palm (with palm detection overlay)
+// Camera 2: HBV HD CAMERA robot-mounted via /stream/2
 
 function startCameras() {
   cameraFrames[0].src = "/stream/palm";
-  cameraFrames[1].src = "/stream";
+  cameraFrames[1].src = "/stream/2";
 }
 
 // ── Chat ──────────────────────────────────────────────────────────────────────
@@ -279,7 +279,6 @@ mobileTabBtns.forEach((btn) => {
     if (tab !== "chat") {
       document.body.classList.add(`mobile-tab-${tab}`);
     }
-    // Never auto-focus on mobile — avoids triggering the on-screen keyboard
   });
 });
 
@@ -327,7 +326,6 @@ async function loadRemoteUrl() {
 window.addEventListener("load", () => {
   applyLayoutSizes();
   startCameras();
-  // Only auto-focus on desktop — on mobile this would open the keyboard immediately
   if (window.matchMedia("(min-width: 769px)").matches) {
     chatInput.focus();
   }

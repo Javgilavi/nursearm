@@ -64,6 +64,7 @@ logger = logging.getLogger(__name__)
 MOCK = os.getenv("NURSEARM_MOCK", "0") == "1"
 WHISPER_MODEL = os.getenv("WHISPER_MODEL", "small")
 WEB_DIR = Path(__file__).resolve().parent / "web"
+CAMERA2_INDEX = int(os.getenv("NURSEARM_CAMERA2_INDEX", "2"))
 
 _JPEG_PARAMS = [cv2.IMWRITE_JPEG_QUALITY, 75]
 _BLANK_FRAME = np.zeros((480, 640, 3), dtype=np.uint8)
@@ -88,9 +89,12 @@ class AppState:
         self._latest_scene: SceneObservation | None = None
         self._latest_jpg: bytes = self._encode_jpg(_BLANK_FRAME)
         self._latest_palm_jpg: bytes = self._encode_jpg(_BLANK_FRAME)
+        self._latest_cam2_jpg: bytes = self._encode_jpg(_BLANK_FRAME)
         self._latest_palm_result: dict = {"detected": False}
         self._palm_log_tick: int = 0
         self._camera_task: asyncio.Task | None = None
+        self._cam2_task: asyncio.Task | None = None
+        self._cam2_capture: cv2.VideoCapture | None = None
         self._whisper: WhisperModel | None = None
         self._whisper_lock = asyncio.Lock()
         self.audit.subscribe(self._broadcast)
@@ -104,11 +108,17 @@ class AppState:
             self.agent = OllamaMCPAgent(self.mcp, audit=self.audit)
             logger.info("Agent backend: Ollama")
         self._camera_task = asyncio.create_task(self._camera_loop())
+        self._cam2_task = asyncio.create_task(self._camera2_loop())
         asyncio.create_task(self._preload_whisper())
 
     async def close(self) -> None:
         if self._camera_task is not None:
             self._camera_task.cancel()
+        if self._cam2_task is not None:
+            self._cam2_task.cancel()
+        if self._cam2_capture is not None:
+            self._cam2_capture.release()
+            self._cam2_capture = None
         if self.agent is not None:
             await self.agent.close()
         await self.mcp.close()
@@ -143,6 +153,41 @@ class AppState:
         raw_jpg = self._encode_jpg(color)
         palm_jpg = self._encode_jpg(self._draw_palm(color, depth))
         return raw_jpg, palm_jpg
+
+    # -- secondary (robot-mounted) camera ----------------------------------------
+
+    async def _camera2_loop(self) -> None:
+        """Capture continuously from the robot-mounted camera (HBV HD CAMERA)."""
+        def _open() -> cv2.VideoCapture | None:
+            cap = cv2.VideoCapture(CAMERA2_INDEX, cv2.CAP_V4L2)
+            if not cap.isOpened():
+                logger.warning("Camera 2 (index %s) could not be opened.", CAMERA2_INDEX)
+                return None
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+            cap.set(cv2.CAP_PROP_FPS, 30)
+            for _ in range(10):  # brief warmup for HBV camera
+                cap.grab()
+            logger.info("Camera 2 opened (index=%s, HBV HD CAMERA).", CAMERA2_INDEX)
+            return cap
+
+        self._cam2_capture = await asyncio.to_thread(_open)
+
+        while True:
+            try:
+                jpg = await asyncio.to_thread(self._capture_cam2_jpg)
+                self._latest_cam2_jpg = jpg
+            except Exception as exc:
+                logger.debug("camera2 capture error: %s", exc)
+            await asyncio.sleep(1 / 30)
+
+    def _capture_cam2_jpg(self) -> bytes:
+        if self._cam2_capture is None or not self._cam2_capture.isOpened():
+            return self._encode_jpg(_BLANK_FRAME)
+        ok, frame = self._cam2_capture.read()
+        if not ok or frame is None or frame.size == 0:
+            return self._encode_jpg(_BLANK_FRAME)
+        return self._encode_jpg(frame)
 
     def _draw_palm(self, color: np.ndarray, depth: np.ndarray) -> np.ndarray:
         """Run palm detection, log result every ~2 s, return annotated frame."""
@@ -431,6 +476,28 @@ async def palm_stream_view() -> StreamingResponse:
     async def generate():
         while True:
             jpg = state._latest_palm_jpg
+            if jpg:
+                yield (
+                    b"--frame\r\n"
+                    b"Content-Type: image/jpeg\r\n\r\n"
+                    + jpg
+                    + b"\r\n"
+                )
+            await asyncio.sleep(1 / 25)
+
+    return StreamingResponse(
+        generate(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+        headers={"Cache-Control": "no-cache, no-store"},
+    )
+
+
+@app.get("/stream/2")
+async def stream2_view() -> StreamingResponse:
+    """MJPEG stream from the robot-mounted HBV HD CAMERA (camera 2)."""
+    async def generate():
+        while True:
+            jpg = state._latest_cam2_jpg
             if jpg:
                 yield (
                     b"--frame\r\n"
