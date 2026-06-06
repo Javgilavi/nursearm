@@ -328,6 +328,19 @@ async def health() -> dict[str, Any]:
     return {"ok": True, "mock": MOCK, "ollama": ollama, "ngrok_url": _ngrok_url}
 
 
+@app.get("/qr.svg")
+async def qr_svg() -> Response:
+    """SVG QR code for the active ngrok tunnel URL."""
+    if not _ngrok_url:
+        raise HTTPException(status_code=404, detail="No remote tunnel active")
+    import io
+    import segno
+    qr = segno.make_qr(_ngrok_url, error="m")
+    buf = io.BytesIO()
+    qr.save(buf, kind="svg", scale=5, border=2, dark="#236f7f", light="#ffffff")
+    return Response(content=buf.getvalue(), media_type="image/svg+xml")
+
+
 @app.get("/state")
 async def state_view() -> dict[str, Any]:
     return state.get_state()

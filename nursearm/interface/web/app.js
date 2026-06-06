@@ -263,6 +263,27 @@ promptChips.forEach((chip) => {
   });
 });
 
+// ── Mobile tabs ───────────────────────────────────────────────────────────────
+
+const mobileTabBtns = document.querySelectorAll(".mobile-tab-btn");
+
+mobileTabBtns.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const tab = btn.dataset.tab;
+    mobileTabBtns.forEach((b) => {
+      b.classList.remove("active");
+      b.setAttribute("aria-pressed", "false");
+    });
+    btn.classList.add("active");
+    btn.setAttribute("aria-pressed", "true");
+    document.body.classList.remove("mobile-tab-camera", "mobile-tab-status");
+    if (tab !== "chat") {
+      document.body.classList.add(`mobile-tab-${tab}`);
+    }
+    // Never auto-focus on mobile — avoids triggering the on-screen keyboard
+  });
+});
+
 // ── Boot ──────────────────────────────────────────────────────────────────────
 
 async function loadRemoteUrl() {
@@ -272,8 +293,10 @@ async function loadRemoteUrl() {
     if (data.ngrok_url) {
       const section = document.getElementById("remote-access");
       const link = document.getElementById("ngrok-link");
+      const qrImg = document.getElementById("qr-image");
       link.href = data.ngrok_url;
       link.textContent = data.ngrok_url.replace("https://", "");
+      qrImg.src = "/qr.svg";
       section.hidden = false;
     }
   } catch { /* server not ready yet — silent */ }
@@ -282,6 +305,9 @@ async function loadRemoteUrl() {
 window.addEventListener("load", () => {
   applyLayoutSizes();
   startCameras();
-  chatInput.focus();
+  // Only auto-focus on desktop — on mobile this would open the keyboard immediately
+  if (window.matchMedia("(min-width: 769px)").matches) {
+    chatInput.focus();
+  }
   loadRemoteUrl();
 });

@@ -175,6 +175,15 @@ h1 {
   border: 1px solid rgba(35, 111, 127, 0.14);
 }
 
+.qr-image {
+  display: block;
+  width: 140px;
+  height: 140px;
+  margin: 10px auto 4px;
+  border-radius: 10px;
+  background: #fff;
+}
+
 .ngrok-link {
   display: block;
   margin-top: 6px;
@@ -183,6 +192,7 @@ h1 {
   word-break: break-all;
   text-decoration: none;
   font-weight: 600;
+  text-align: center;
 }
 
 .ngrok-link:hover {
@@ -602,6 +612,8 @@ body.is-resizing-horizontal * {
   border: 0;
 }
 
+/* ── Tablet (≤ 1180px) — single column, scrollable ──────────────────────── */
+
 @media (max-width: 1180px) {
   html,
   body {
@@ -651,32 +663,257 @@ body.is-resizing-horizontal * {
   }
 }
 
-@media (max-width: 760px) {
-  .app-shell {
-    padding: 16px 14px 22px;
-    gap: 14px;
+/* ── Phone (≤ 768px) — floating-pill tab layout ──────────────────────────
+   Three tabs: Chat (default) | Camera (both feeds) | Status
+   Desktop (> 768px) is completely unaffected.                     ────────── */
+
+.mobile-tab-bar {
+  display: none; /* hidden on desktop / tablet */
+}
+
+@media (max-width: 768px) {
+  html,
+  body {
+    overflow: hidden;
+    height: 100%;
   }
 
-  .rail,
-  .rail-card,
-  .panel {
-    border-radius: 22px;
+  .app-shell {
+    height: 100%;
+    min-height: unset;
+    padding: 0;
+    gap: 0;
+    padding-bottom: 92px; /* room for floating pill tab bar */
+  }
+
+  .workspace {
+    display: block;
+    height: 100%;
+    overflow: hidden;
+    grid-template-columns: unset;
+  }
+
+  /* ── Rail (Status tab) ── */
+
+  .rail {
+    display: none;
+    height: 100%;
+    overflow-y: auto;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+    padding: 24px 20px;
+    gap: 14px;
+    background: var(--bg);
   }
 
   .rail-stack {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    grid-template-columns: unset;
   }
 
-  .camera-panel,
+  /* ── Layout (Chat + Camera tabs) ── */
+
+  #layout {
+    display: block;
+    height: 100%;
+    grid-template-columns: unset;
+  }
+
+  #camera-column {
+    display: none;
+    height: 100%;
+    flex-direction: unset;
+    gap: 0;
+  }
+
+  /* Splitters always hidden on mobile */
+  #camera-splitter,
+  #layout-splitter {
+    display: none !important;
+  }
+
+  /* Camera 2 hidden except on Camera tab (overridden below) */
+  #camera-column > .camera-panel:last-of-type {
+    display: none;
+  }
+
+  /* Chat panel: default visible, fills layout */
   .chat-panel {
-    padding: 16px;
+    display: flex !important;
+    height: 100%;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+    padding: 20px 16px 14px;
+    min-height: unset;
+    background: var(--bg);
   }
 
-  .chat-form {
-    grid-template-columns: 1fr auto auto;
+  .chat-tip { display: none; }
+
+  .quick-actions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .quick-actions::-webkit-scrollbar { display: none; }
+
+  .message { max-width: 100%; }
+
+  .chat-head { margin-bottom: 12px; }
+
+  /* ── Camera tab — both feeds stacked ── */
+
+  body.mobile-tab-camera #camera-column {
+    display: flex !important;
+    flex-direction: column;
+    height: 100%;
+    gap: 2px;
+    background: #080e12;
   }
 
-  .message {
-    max-width: 100%;
+  body.mobile-tab-camera .chat-panel {
+    display: none !important;
+  }
+
+  body.mobile-tab-camera #camera-column > .camera-panel {
+    flex: 1;
+    min-height: 0;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    min-height: unset;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Show Camera 2 on camera tab */
+  body.mobile-tab-camera #camera-column > .camera-panel:last-of-type {
+    display: flex !important;
+  }
+
+  /* Gradient overlay carrying the label */
+  body.mobile-tab-camera .panel-top {
+    display: flex !important;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 10px 12px 28px;
+    margin: 0;
+    background: linear-gradient(to bottom, rgba(8, 14, 18, 0.55), transparent);
+    z-index: 5;
+    pointer-events: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  body.mobile-tab-camera .panel-kicker {
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 0.65rem;
+  }
+
+  body.mobile-tab-camera .panel-top h2 { display: none; }
+  body.mobile-tab-camera .panel-note   { display: none !important; }
+
+  body.mobile-tab-camera .live-badge {
+    font-size: 0.62rem;
+    padding: 3px 8px;
+    gap: 5px;
+    background: rgba(47, 127, 111, 0.5);
+    border-color: rgba(47, 127, 111, 0.25);
+    color: rgba(255, 255, 255, 0.92);
+  }
+
+  body.mobile-tab-camera .live-badge::before {
+    width: 5px;
+    height: 5px;
+    box-shadow: none;
+  }
+
+  body.mobile-tab-camera .camera-stage {
+    border-radius: 0 !important;
+    background: #080e12;
+  }
+
+  /* ── Status tab ── */
+
+  body.mobile-tab-status #layout { display: none; }
+  body.mobile-tab-status .rail   { display: flex; }
+
+  /* ── Floating pill tab bar ── */
+
+  .mobile-tab-bar {
+    display: flex;
+    align-items: center;
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 5px;
+    gap: 4px;
+    background: rgba(238, 244, 247, 0.68);
+    backdrop-filter: blur(28px) saturate(1.4);
+    -webkit-backdrop-filter: blur(28px) saturate(1.4);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    border-radius: 999px;
+    box-shadow:
+      0 8px 32px rgba(18, 32, 41, 0.18),
+      0 2px 8px rgba(18, 32, 41, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.65);
+    z-index: 200;
+    /* account for iPhone home indicator */
+    margin-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .mobile-tab-btn {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    border: 0;
+    border-radius: 999px;
+    padding: 11px 18px;
+    background: transparent;
+    color: var(--muted-strong);
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background 220ms ease,
+      color 220ms ease,
+      box-shadow 220ms ease,
+      padding 220ms ease;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  .mobile-tab-btn svg {
+    width: 18px;
+    height: 18px;
+    stroke-width: 2;
+    flex-shrink: 0;
+    transition: stroke-width 220ms ease;
+  }
+
+  .mobile-tab-btn.active {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 4px 16px rgba(35, 111, 127, 0.4);
+    padding: 11px 22px;
+  }
+
+  .mobile-tab-btn.active svg {
+    stroke-width: 2.4;
   }
 }

@@ -36,6 +36,7 @@
 
           <section id="remote-access" class="rail-remote" hidden>
             <p class="rail-foot-label">Remote access</p>
+            <img id="qr-image" class="qr-image" alt="Scan to connect" />
             <a id="ngrok-link" class="ngrok-link" href="#" target="_blank" rel="noopener"></a>
           </section>
 
@@ -118,6 +119,30 @@
         </main>
       </div>
     </div>
+
+    <!-- Mobile bottom tab bar — hidden on desktop via CSS -->
+    <nav class="mobile-tab-bar" aria-label="Navigation tabs">
+      <button class="mobile-tab-btn active" data-tab="chat" aria-pressed="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+        <span>Chat</span>
+      </button>
+      <button class="mobile-tab-btn" data-tab="camera" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+          <circle cx="12" cy="13" r="4"/>
+        </svg>
+        <span>Camera</span>
+      </button>
+      <button class="mobile-tab-btn" data-tab="status" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
+          <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+        </svg>
+        <span>Status</span>
+      </button>
+    </nav>
 
     <script src="/static/app.js"></script>
   </body>
