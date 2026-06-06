@@ -264,20 +264,6 @@ or `— no hand`). The server logs palm status at INFO level every ~2 seconds.
 
 ---
 
-## Accessing from a phone
-
-If ngrok is installed and authenticated, the server prints the public URL at startup:
-
-```
-========================================================
-  Phone / remote access:  https://abc123.ngrok-free.app
-========================================================
-```
-
-The URL also appears as a QR code in the sidebar of the UI.
-
----
-
 ## Current UI — Clinical Console
 
 ```
