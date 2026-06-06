@@ -8,6 +8,7 @@ Endpoints:
   GET  /stream          -> MJPEG live camera stream (browser-native, no JS polling)
   GET  /frame           -> single latest JPEG frame
   POST /chat            -> {"text": ...}; runs local Ollama agent via MCP, returns reply
+  POST /transcribe      -> audio file upload; returns {"text": ...} via Faster-Whisper
   WS   /audit           -> streams audit events live
   GET  /health          -> liveness + Ollama model status
 
@@ -21,16 +22,20 @@ import asyncio
 import logging
 import os
 import subprocess
+import tempfile
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 import cv2
 import numpy as np
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    from faster_whisper import WhisperModel
 
 from nursearm.audit.log import AuditLog
 from nursearm.mcp.client import NurseArmMCPClient
@@ -54,6 +59,7 @@ logging.getLogger("uvicorn.access").addFilter(_NoiseFilter())
 logger = logging.getLogger(__name__)
 
 MOCK = os.getenv("NURSEARM_MOCK", "0") == "1"
+WHISPER_MODEL = os.getenv("WHISPER_MODEL", "small")
 WEB_DIR = Path(__file__).resolve().parent / "web"
 
 _JPEG_PARAMS = [cv2.IMWRITE_JPEG_QUALITY, 75]
@@ -79,12 +85,15 @@ class AppState:
         self._latest_scene: SceneObservation | None = None
         self._latest_jpg: bytes = self._encode_jpg(_BLANK_FRAME)
         self._camera_task: asyncio.Task | None = None
+        self._whisper: WhisperModel | None = None
+        self._whisper_lock = asyncio.Lock()
         self.audit.subscribe(self._broadcast)
 
     async def start(self) -> None:
         await self.mcp.connect()
         self.agent = OllamaMCPAgent(self.mcp, audit=self.audit)
         self._camera_task = asyncio.create_task(self._camera_loop())
+        asyncio.create_task(self._preload_whisper())
 
     async def close(self) -> None:
         if self._camera_task is not None:
@@ -122,6 +131,46 @@ class AppState:
     def _encode_jpg(frame: np.ndarray) -> bytes:
         ok, buf = cv2.imencode(".jpg", frame, _JPEG_PARAMS)
         return bytes(buf) if ok else b""
+
+    # -- speech-to-text ----------------------------------------------------------
+
+    async def _preload_whisper(self) -> None:
+        try:
+            await self.get_whisper()
+        except Exception as exc:
+            logger.warning("Whisper preload failed: %s", exc)
+
+    async def get_whisper(self) -> "WhisperModel":
+        async with self._whisper_lock:
+            if self._whisper is None:
+                self._whisper = await asyncio.to_thread(self._load_whisper)
+        return self._whisper
+
+    @staticmethod
+    def _load_whisper() -> "WhisperModel":
+        from faster_whisper import WhisperModel  # noqa: PLC0415
+        # RTX 5070 (Blackwell sm_120) crashes with int8 — always use float16 on CUDA.
+        try:
+            model = WhisperModel(WHISPER_MODEL, device="cuda", compute_type="float16")
+            logger.info("Faster-Whisper loaded (%s, cuda/float16).", WHISPER_MODEL)
+        except Exception:
+            model = WhisperModel(WHISPER_MODEL, device="cpu", compute_type="int8")
+            logger.info("Faster-Whisper loaded (%s, cpu/int8).", WHISPER_MODEL)
+        return model
+
+    async def transcribe_audio(self, data: bytes, suffix: str = ".webm") -> str:
+        model = await self.get_whisper()
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
+            f.write(data)
+            tmp_path = f.name
+        try:
+            def _run() -> str:
+                # Consume the lazy generator inside this thread — do not return it.
+                segments, _ = model.transcribe(tmp_path, beam_size=5, vad_filter=True, language="en")
+                return " ".join(s.text.strip() for s in segments).strip()
+            return await asyncio.to_thread(_run)
+        finally:
+            os.unlink(tmp_path)
 
     # -- scene / state -----------------------------------------------------------
 
@@ -272,6 +321,18 @@ async def stream_view() -> StreamingResponse:
 async def frame_view() -> Response:
     """Single latest JPEG frame (for snapshot use)."""
     return Response(content=state._latest_jpg, media_type="image/jpeg")
+
+
+@app.post("/transcribe")
+async def transcribe(audio: UploadFile = File(...)) -> dict[str, str]:
+    """Transcribe uploaded audio (WebM/Opus or any ffmpeg format) via Faster-Whisper."""
+    data = await audio.read()
+    suffix = Path(audio.filename or "recording.webm").suffix or ".webm"
+    try:
+        text = await state.transcribe_audio(data, suffix=suffix)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Transcription failed: {exc}") from exc
+    return {"text": text}
 
 
 @app.post("/chat")

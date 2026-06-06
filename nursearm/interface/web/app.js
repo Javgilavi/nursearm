@@ -9,6 +9,7 @@ const cameraFrames = [
 const chatForm = document.getElementById("chat-form");
 const chatInput = document.getElementById("chat-input");
 const sendButton = document.querySelector(".send-button");
+const micButton = document.getElementById("mic-button");
 const chatMessages = document.getElementById("chat-messages");
 const promptChips = document.querySelectorAll("[data-prompt]");
 
@@ -176,6 +177,85 @@ async function onSubmit(event) {
 }
 
 chatForm.addEventListener("submit", onSubmit);
+
+// ── Voice input ───────────────────────────────────────────────────────────────
+
+let mediaRecorder = null;
+let audioChunks = [];
+
+function setMicState(s) {
+  micButton.dataset.state = s;
+  micButton.disabled = s === "transcribing";
+  micButton.title = s === "recording" ? "Stop recording" : "Voice input";
+}
+
+micButton.addEventListener("click", async () => {
+  if (micButton.dataset.state === "idle") {
+    await startRecording();
+  } else if (micButton.dataset.state === "recording") {
+    stopRecording();
+  }
+});
+
+async function startRecording() {
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch {
+    appendMessage("assistant", "Microphone access denied — check browser permissions.");
+    return;
+  }
+
+  audioChunks = [];
+  const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+    ? "audio/webm;codecs=opus"
+    : "audio/webm";
+  mediaRecorder = new MediaRecorder(stream, { mimeType });
+  mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
+  mediaRecorder.onstop = async () => {
+    stream.getTracks().forEach((t) => t.stop());
+    await transcribeRecording();
+  };
+  mediaRecorder.start();
+  setMicState("recording");
+}
+
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state !== "inactive") {
+    mediaRecorder.stop();
+  }
+}
+
+async function transcribeRecording() {
+  setMicState("transcribing");
+  setLoading(true);
+  chatInput.placeholder = "Transcribing…";
+  const blob = new Blob(audioChunks, { type: "audio/webm" });
+  const formData = new FormData();
+  formData.append("audio", blob, "recording.webm");
+  let transcribedText = null;
+  try {
+    const response = await fetch("/transcribe", { method: "POST", body: formData });
+    const payload = await response.json();
+    if (response.ok && payload.text) {
+      transcribedText = payload.text;
+    } else if (!response.ok) {
+      appendMessage("assistant", `Transcription error: ${payload.detail || "unknown"}`);
+    }
+  } catch {
+    appendMessage("assistant", "Could not reach the transcription service.");
+  } finally {
+    setMicState("idle");
+    setLoading(false);
+    chatInput.placeholder = "Type or speak your instruction";
+    if (transcribedText) {
+      chatInput.value = transcribedText;
+      chatInput.focus();
+      chatInput.setSelectionRange(transcribedText.length, transcribedText.length);
+    }
+  }
+}
+
 promptChips.forEach((chip) => {
   chip.addEventListener("click", () => {
     chatInput.value = chip.dataset.prompt || "";
