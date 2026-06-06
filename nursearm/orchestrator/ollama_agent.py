@@ -1,0 +1,168 @@
+"""Local Ollama agent that discovers and executes NurseArm tools through MCP."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+from typing import Any
+
+import httpx
+
+from nursearm import config
+from nursearm.mcp.client import NurseArmMCPClient
+
+DEFAULT_MODEL = "qwen3:4b"
+DEFAULT_URL = "http://127.0.0.1:11434"
+MAX_TURNS = 12
+SYSTEM_PROMPT = """You are the NurseArm task-level assistant.
+Use the available tools when a request requires a NurseArm capability.
+Select only tools relevant to the user's request.
+Never claim an action succeeded until its tool result reports success.
+Never invent tools, raw motor commands, medication details, or completed actions.
+Ask for missing safety-critical information before running a high-risk skill.
+Keep final answers concise and clear.
+"""
+
+
+class OllamaUnavailableError(RuntimeError):
+    """Raised when the local Ollama service or configured model is unavailable."""
+
+
+class OllamaMCPAgent:
+    """Run a local model tool loop against the NurseArm MCP server."""
+
+    def __init__(
+        self,
+        mcp_client: NurseArmMCPClient,
+        audit: Any | None = None,
+        http_client: httpx.AsyncClient | None = None,
+    ) -> None:
+        self.mcp = mcp_client
+        self.audit = audit
+        self.model = config.env("OLLAMA_MODEL", DEFAULT_MODEL)
+        self.base_url = str(config.env("OLLAMA_URL", DEFAULT_URL)).rstrip("/")
+        self._owns_http_client = http_client is None
+        self.http = http_client or httpx.AsyncClient(timeout=120.0)
+        self._chat_lock = asyncio.Lock()
+        self.messages: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+    async def close(self) -> None:
+        if self._owns_http_client:
+            await self.http.aclose()
+
+    async def handle(self, user_intent: str) -> str:
+        async with self._chat_lock:
+            return await self._handle_locked(user_intent)
+
+    async def _handle_locked(self, user_intent: str) -> str:
+        self._log({"event": "user_intent", "text": user_intent})
+        self.messages.append({"role": "user", "content": user_intent})
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": tool.name,
+                    "description": tool.description or "",
+                    "parameters": tool.inputSchema,
+                },
+            }
+            for tool in await self.mcp.list_tools()
+        ]
+
+        for _ in range(MAX_TURNS):
+            message = await self._chat(self.messages, tools)
+            self.messages.append(message)
+            tool_calls = message.get("tool_calls") or []
+
+            if not tool_calls:
+                reply = str(message.get("content") or "").strip()
+                self._log({"event": "report", "text": reply})
+                self._trim_history()
+                return reply or "The local model returned an empty response."
+
+            for tool_call in tool_calls:
+                function = tool_call.get("function", {})
+                name = function.get("name", "")
+                arguments = function.get("arguments") or {}
+                if isinstance(arguments, str):
+                    arguments = json.loads(arguments)
+                result = await self.mcp.call_tool(name, arguments)
+                self._log(
+                    {
+                        "event": "mcp_tool",
+                        "tool": name,
+                        "args": arguments,
+                        "result": result,
+                    }
+                )
+                self.messages.append(
+                    {
+                        "role": "tool",
+                        "tool_name": name,
+                        "content": json.dumps(result),
+                    }
+                )
+
+        self._trim_history()
+        return "Stopped after reaching the local agent turn limit."
+
+    def _trim_history(self) -> None:
+        if len(self.messages) > 41:
+            self.messages = [self.messages[0], *self.messages[-40:]]
+
+    async def model_status(self) -> dict[str, Any]:
+        try:
+            response = await self.http.get(f"{self.base_url}/api/tags", timeout=3.0)
+            response.raise_for_status()
+            models = [item.get("name", "") for item in response.json().get("models", [])]
+            return {
+                "available": True,
+                "model": self.model,
+                "model_installed": self.model in models,
+                "url": self.base_url,
+            }
+        except (httpx.HTTPError, ValueError):
+            return {
+                "available": False,
+                "model": self.model,
+                "model_installed": False,
+                "url": self.base_url,
+            }
+
+    async def _chat(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        try:
+            response = await self.http.post(
+                f"{self.base_url}/api/chat",
+                json={
+                    "model": self.model,
+                    "messages": messages,
+                    "tools": tools,
+                    "stream": False,
+                    "think": False,
+                },
+            )
+            response.raise_for_status()
+        except httpx.ConnectError as exc:
+            raise OllamaUnavailableError(
+                f"Cannot reach Ollama at {self.base_url}. Start it with `ollama serve`."
+            ) from exc
+        except httpx.HTTPStatusError as exc:
+            detail = exc.response.text.strip()
+            raise OllamaUnavailableError(
+                f"Ollama rejected model {self.model!r}. Run `ollama pull {self.model}`. {detail}"
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise OllamaUnavailableError(f"Ollama request failed: {exc}") from exc
+
+        try:
+            return response.json()["message"]
+        except (KeyError, TypeError, ValueError) as exc:
+            raise OllamaUnavailableError("Ollama returned an invalid chat response.") from exc
+
+    def _log(self, event: dict[str, Any]) -> None:
+        if self.audit is not None:
+            self.audit.log(event)
