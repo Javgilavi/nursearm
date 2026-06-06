@@ -1,16 +1,17 @@
 """FastAPI backend for the NurseArm operator UI.
 
 Endpoints:
-  GET  /            -> the web UI
-  GET  /state       -> current mock/live status + scene summary
-  GET  /scene       -> current RGB-D scene summary
-  GET  /frame       -> latest camera frame as PNG
-  POST /chat        -> {"text": ...}; runs the judge and returns its reply
-  WS   /audit       -> streams audit events live
-  GET  /health      -> liveness
+  GET  /                -> the web UI
+  GET  /static/{path}   -> static files (app.js, styles.css)
+  GET  /state           -> current status + scene summary
+  GET  /scene           -> current RGB-D scene summary
+  GET  /frame           -> latest camera frame as PNG
+  POST /chat            -> {"text": ...}; runs local Ollama agent via MCP, returns reply
+  WS   /audit           -> streams audit events live
+  GET  /health          -> liveness + Ollama model status
 
 Run locally in mock mode:
-    NURSEARM_MOCK=1 python3 -m uvicorn nursearm.interface.server:app --reload
+    NURSEARM_MOCK=1 uvicorn nursearm.interface.server:app --reload
 """
 
 from __future__ import annotations
@@ -24,14 +25,13 @@ from typing import Any
 
 import cv2
 import numpy as np
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
 from nursearm.audit.log import AuditLog
-from nursearm.integrations.calendar import make_calendar_client
-from nursearm.orchestrator.judge import Judge
-from nursearm.orchestrator.recovery import RecoveryManager
+from nursearm.mcp.client import NurseArmMCPClient
+from nursearm.orchestrator.ollama_agent import OllamaMCPAgent, OllamaUnavailableError
 from nursearm.orchestrator.skill_registry import SkillRegistry
 from nursearm.perception.realsense import Perception
 from nursearm.robot.controller import RobotController
@@ -48,31 +48,6 @@ class ChatIn(BaseModel):
     text: str
 
 
-class MockJudge:
-    """Fallback judge used when running the UI without external API keys."""
-
-    def __init__(self, audit: AuditLog, perception: Perception) -> None:
-        self.audit = audit
-        self.perception = perception
-
-    def handle(self, user_intent: str) -> str:
-        self.audit.log({"event": "user_intent", "text": user_intent})
-        scene = self.perception.observe()
-        summary = scene.summary()
-        lowered = user_intent.lower()
-        if any(word in lowered for word in ("pill", "pastilla", "medicine")):
-            reply = "Mock judge: I would prepare the pill handling routine."
-        elif any(word in lowered for word in ("feed", "agua", "drink")):
-            reply = "Mock judge: I would prepare the feeding routine."
-        elif any(word in lowered for word in ("hand", "pass", "handoff", "give")):
-            reply = "Mock judge: I would prepare the handoff routine."
-        else:
-            reply = "Mock judge: request registered."
-        self.audit.log({"event": "tool", "tool": "get_scene", "result": summary})
-        self.audit.log({"event": "report", "text": reply})
-        return reply
-
-
 class AppState:
     """Long-lived application singletons."""
 
@@ -81,32 +56,24 @@ class AppState:
         self.robot = RobotController(mock=MOCK)
         self.perception = Perception(mock=MOCK)
         self.skills = SkillRegistry()
-        self.recovery = RecoveryManager()
-        self.calendar = make_calendar_client()
+        self.mcp = NurseArmMCPClient()
+        self.agent: OllamaMCPAgent | None = None
         self.loop: asyncio.AbstractEventLoop | None = None
         self._ws_clients: set[WebSocket] = set()
         self._latest_scene: SceneObservation | None = None
         self._latest_frame: np.ndarray | None = None
         self.audit.subscribe(self._broadcast)
-        self.judge = self._make_judge()
 
-    def _speak(self, text: str) -> None:
-        from nursearm.interface import voice
+    async def start(self) -> None:
+        await self.mcp.connect()
+        self.agent = OllamaMCPAgent(self.mcp, audit=self.audit)
 
-        voice.say(text)
-
-    def _make_judge(self) -> Judge | MockJudge:
-        if MOCK:
-            return MockJudge(self.audit, self.perception)
-        return Judge(
-            self.skills,
-            self.perception,
-            self.robot,
-            self.audit,
-            self.recovery,
-            self.calendar,
-            speak_fn=self._speak,
-        )
+    async def close(self) -> None:
+        if self.agent is not None:
+            await self.agent.close()
+        await self.mcp.close()
+        self.robot.disconnect()
+        self.perception.close()
 
     def _broadcast(self, event: dict[str, Any]) -> None:
         if self.loop is None:
@@ -117,17 +84,11 @@ class AppState:
     def get_scene_summary(self) -> dict[str, Any]:
         try:
             scene = self.perception.observe()
-        except Exception as exc:  # keep the UI alive even if a camera fails
+        except Exception as exc:
             logger.exception("scene observation failed")
             self._latest_scene = None
             self._latest_frame = None
-            return {
-                "ok": False,
-                "error": str(exc),
-                "mock": MOCK,
-                "scene": None,
-            }
-
+            return {"ok": False, "error": str(exc), "mock": MOCK, "scene": None}
         self._latest_scene = scene
         self._latest_frame = scene.frame
         payload = scene.summary()
@@ -169,13 +130,10 @@ class AppState:
                     cv2.LINE_AA,
                 )
                 return self._encode_png(color)
-
         if color is None or color.size == 0:
             color = np.zeros((480, 640, 3), dtype=np.uint8)
-
         if self.perception.mock:
             color = self._make_mock_frame(color)
-
         return self._encode_png(color)
 
     @staticmethod
@@ -208,12 +166,12 @@ async def lifespan(app: FastAPI):
     global state
     state = AppState()
     state.loop = asyncio.get_running_loop()
+    await state.start()
     logger.info("NurseArm ready (mock=%s).", MOCK)
     try:
         yield
     finally:
-        state.robot.disconnect()
-        state.perception.close()
+        await state.close()
 
 
 app = FastAPI(title="NurseArm", lifespan=lifespan)
@@ -231,7 +189,8 @@ async def static_file(path: str) -> FileResponse:
 
 @app.get("/health")
 async def health() -> dict[str, Any]:
-    return {"ok": True, "mock": MOCK}
+    ollama = await state.agent.model_status() if state.agent else {"available": False}
+    return {"ok": True, "mock": MOCK, "ollama": ollama}
 
 
 @app.get("/state")
@@ -251,7 +210,10 @@ async def frame_view() -> Response:
 
 @app.post("/chat")
 async def chat(msg: ChatIn) -> dict[str, str]:
-    reply = await asyncio.to_thread(state.judge.handle, msg.text)
+    try:
+        reply = await state.agent.handle(msg.text)
+    except OllamaUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     return {"reply": reply}
 
 
