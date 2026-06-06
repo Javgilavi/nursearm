@@ -8,56 +8,103 @@
   </head>
   <body>
     <div class="app-shell">
-      <header class="header">
-        <div>
-          <p class="eyebrow">NurseArm</p>
-          <h1>Operator Console</h1>
-          <p class="subtitle">Camera 1 top left, Camera 2 bottom left, chat on the right.</p>
-        </div>
-      </header>
-
-      <main class="layout" id="layout">
-        <section class="camera-column" id="camera-column">
-          <section class="panel camera-panel">
-            <p class="panel-kicker">Camera 1</p>
-            <div class="camera-stage">
-              <img id="camera-frame-1" class="camera-frame" alt="Camera 1 view" src="/frame" />
-            </div>
-          </section>
-
-          <div class="splitter splitter-horizontal" id="camera-splitter" role="separator" aria-label="Resize camera panes" aria-orientation="horizontal" tabindex="0"></div>
-
-          <section class="panel camera-panel">
-            <p class="panel-kicker">Camera 2</p>
-            <div class="camera-stage">
-              <img id="camera-frame-2" class="camera-frame" alt="Camera 2 view" src="/frame" />
-            </div>
-          </section>
-        </section>
-
-        <div class="splitter splitter-vertical" id="layout-splitter" role="separator" aria-label="Resize chat panel" aria-orientation="vertical" tabindex="0"></div>
-
-        <section class="panel chat-panel">
-          <div class="chat-head">
-            <div>
-              <p class="panel-kicker">Chat</p>
-              <h2>Operator instructions</h2>
-            </div>
+      <div class="workspace">
+        <aside class="rail" aria-label="System summary">
+          <div class="rail-brand">
+            <p class="eyebrow">NurseArm</p>
+            <h1>Clinical console</h1>
+            <p class="subtitle">Low-noise control surface for bedside assistance.</p>
           </div>
 
-          <div class="chat-tip">Try: "Give me my morning pills".</div>
+          <section class="rail-stack">
+            <article class="rail-card">
+              <span class="status-label">System</span>
+              <strong>Online</strong>
+              <span>Ready for operator input</span>
+            </article>
+            <article class="rail-card">
+              <span class="status-label">Cameras</span>
+              <strong>Synced</strong>
+              <span>Refreshing every 3 seconds</span>
+            </article>
+            <article class="rail-card">
+              <span class="status-label">Audit</span>
+              <strong>Enabled</strong>
+              <span>Every action is logged</span>
+            </article>
+          </section>
 
-          <div id="chat-messages" class="chat-messages"></div>
+          <section class="rail-foot">
+            <p class="rail-foot-label">Focus</p>
+            <p>Watch the camera overview, then issue short chat commands.</p>
+          </section>
+        </aside>
 
-          <div class="composer-shell">
-            <form id="chat-form" class="chat-form">
-              <label class="sr-only" for="chat-input">Message</label>
-              <input id="chat-input" name="message" type="text" autocomplete="off" placeholder="Type your instruction here" />
-              <button type="submit" class="send-button">Send</button>
-            </form>
-          </div>
-        </section>
-      </main>
+        <main class="layout" id="layout">
+          <section class="camera-column" id="camera-column">
+            <section class="panel camera-panel">
+              <div class="panel-top">
+                <div>
+                  <p class="panel-kicker">Camera 1</p>
+                  <h2>Overhead view</h2>
+                </div>
+                <span class="live-badge">Live</span>
+              </div>
+              <p class="panel-note">Primary workspace and object-detection feed.</p>
+              <div class="camera-stage">
+                <img id="camera-frame-1" class="camera-frame" alt="Camera 1 view" src="/frame" />
+              </div>
+            </section>
+
+            <div class="splitter splitter-horizontal" id="camera-splitter" role="separator" aria-label="Resize camera panes" aria-orientation="horizontal" tabindex="0"></div>
+
+            <section class="panel camera-panel">
+              <div class="panel-top">
+                <div>
+                  <p class="panel-kicker">Camera 2</p>
+                  <h2>Side view</h2>
+                </div>
+                <span class="live-badge">Live</span>
+              </div>
+              <p class="panel-note">Secondary perspective for verification and safety.</p>
+              <div class="camera-stage">
+                <img id="camera-frame-2" class="camera-frame" alt="Camera 2 view" src="/frame" />
+              </div>
+            </section>
+          </section>
+
+          <div class="splitter splitter-vertical" id="layout-splitter" role="separator" aria-label="Resize chat panel" aria-orientation="vertical" tabindex="0"></div>
+
+          <section class="panel chat-panel">
+            <div class="chat-head">
+              <div>
+                <p class="panel-kicker">Chat</p>
+                <h2>Operator instructions</h2>
+                <p class="panel-note">Use short, explicit prompts. The assistant will confirm actions and log them.</p>
+              </div>
+              <span class="audit-badge">Audit on</span>
+            </div>
+
+            <div class="chat-tip">Try: "Give me my morning pills."</div>
+
+            <div class="quick-actions" aria-label="Suggested prompts">
+              <button type="button" class="prompt-chip" data-prompt="Give me my morning pills.">Morning pills</button>
+              <button type="button" class="prompt-chip" data-prompt="Check the scene and report what you see.">Scene check</button>
+              <button type="button" class="prompt-chip" data-prompt="Help me with feeding.">Feeding help</button>
+            </div>
+
+            <div id="chat-messages" class="chat-messages" aria-live="polite" aria-relevant="additions"></div>
+
+            <div class="composer-shell">
+              <form id="chat-form" class="chat-form">
+                <label class="sr-only" for="chat-input">Message</label>
+                <input id="chat-input" name="message" type="text" autocomplete="off" placeholder="Type your instruction here" />
+                <button type="submit" class="send-button">Send</button>
+              </form>
+            </div>
+          </section>
+        </main>
+      </div>
     </div>
 
     <script src="/static/app.js"></script>

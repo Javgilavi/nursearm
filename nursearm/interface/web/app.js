@@ -9,6 +9,7 @@ const cameraFrames = [
 const chatForm = document.getElementById("chat-form");
 const chatInput = document.getElementById("chat-input");
 const chatMessages = document.getElementById("chat-messages");
+const promptChips = document.querySelectorAll("[data-prompt]");
 
 const STORAGE_KEY = "nursearm.ui.sizes";
 const DEFAULTS = {
@@ -50,6 +51,7 @@ function refreshFrames() {
 function appendMessage(role, content) {
   const node = document.createElement("article");
   node.className = `message ${role}`;
+  node.setAttribute("aria-label", role === "user" ? "Your message" : "Assistant message");
   node.textContent = content;
   chatMessages.appendChild(node);
   chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -130,10 +132,10 @@ function startResize(orientation, event) {
   const onUp = () => {
     document.removeEventListener("pointermove", onMove);
     document.removeEventListener("pointerup", onUp);
-    document.body.classList.remove("is-resizing");
+    document.body.classList.remove("is-resizing", "is-resizing-vertical", "is-resizing-horizontal");
   };
 
-  document.body.classList.add("is-resizing");
+  document.body.classList.add("is-resizing", `is-resizing-${orientation}`);
   document.addEventListener("pointermove", onMove);
   document.addEventListener("pointerup", onUp);
 }
@@ -142,6 +144,12 @@ cameraSplit.addEventListener("pointerdown", (event) => startResize("horizontal",
 layoutSplit.addEventListener("pointerdown", (event) => startResize("vertical", event));
 
 chatForm.addEventListener("submit", onSubmit);
+promptChips.forEach((chip) => {
+  chip.addEventListener("click", () => {
+    chatInput.value = chip.dataset.prompt || "";
+    chatInput.focus();
+  });
+});
 
 window.addEventListener("resize", applyLayoutSizes);
 window.addEventListener("load", () => {
