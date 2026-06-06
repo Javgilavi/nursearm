@@ -12,6 +12,7 @@ here to assistive care.
 
 - **[PLAN.md](./PLAN.md)** — the 24-hour build plan, scope control, and owner split.
 - **[AGENT.md](./AGENT.md)** — how the LLM judge drives the robot (the heart of the project).
+- **[MCP.md](./MCP.md)** — install, test, and connect the MCP server to an LLM.
 
 ---
 
@@ -87,7 +88,7 @@ uv pip install -e ".[feetech]"          # SO-101 motors (not installed by defaul
 
 # 2) install NurseArm + its vision deps into that same venv
 cd ../nursearm
-uv pip install -e ".[robot,calendar]"   # add ,voice or ,mcp if you use them
+uv pip install -e ".[robot,calendar]"   # add ,voice if you use it
 ```
 
 Standalone alternative (separate venv): `uv venv --python 3.12 && uv pip install -e ".[robot,calendar]"`,
@@ -100,16 +101,29 @@ then install LeRobot separately with `pip install 'lerobot[feetech]'`.
 ### Laptop, no hardware (verify the brain first)
 
 ```bash
-cp .env.example .env          # set ANTHROPIC_API_KEY; leave NURSEARM_MOCK=1
+cp .env.example .env          # set OLLAMA_MODEL / OLLAMA_URL if needed; leave NURSEARM_MOCK=1
+uv sync --extra dev
 NURSEARM_MOCK=1 nursearm-serve
 # open http://localhost:8000  →  type "give me my morning pills"
 ```
 
-In mock mode the robot and camera are stubbed, so the **judge loop, the skill
-selection, the calendar tool, and the audit log all run on a laptop** — perfect for
-building and demoing the orchestration before the hardware is ready. Skills will report
-"not implemented" until their policies are trained, which is exactly what the judge's
-recovery/ask-human logic is there to handle.
+Starting the interface also starts its local MCP server automatically as a managed
+stdio subprocess. Do not start `nursearm-mcp` separately for normal UI development.
+
+In mock mode the robot and camera are stubbed, so the **Claude MCP agent, MCP skill
+discovery, dummy skill execution, and audit log all run on a laptop**. Real skills
+remain unavailable until their perception and policy implementations are completed.
+
+### Startup modes
+
+| Goal | Command | MCP behavior |
+|---|---|---|
+| Run the web interface | `NURSEARM_MOCK=1 uv run uvicorn nursearm.interface.server:app --reload` | FastAPI automatically starts and owns a local stdio MCP subprocess |
+| Test MCP from Codex or Inspector | `NURSEARM_MOCK=1 uv run nursearm-mcp --transport streamable-http` | Standalone HTTP MCP server at `http://127.0.0.1:8000/mcp` |
+| Test MCP without an LLM | `NURSEARM_MOCK=1 uv run python scripts/test_mcp.py` | Test script automatically starts a local stdio MCP subprocess |
+
+The web interface and standalone HTTP MCP server both use port `8000` by default, so
+do not run them simultaneously unless one is configured to use a different port.
 
 ### With the robot
 
@@ -147,15 +161,15 @@ There are two directories named `nursearm`:
 A normal text request follows this path:
 
 1. `interface/web/index.html` sends text to `POST /chat`.
-2. `interface/server.py` owns the long-lived robot, camera, registry, audit log, and judge objects, and serves `GET /state`, `GET /scene`, `GET /frame`, and `WS /audit`.
-3. `orchestrator/judge.py` sends the request to Claude with a bounded tool list.
-4. The judge can inspect `perception`, query `integrations/calendar.py`, or invoke a named skill through `skill_registry.py`.
+2. `interface/server.py` owns robot, camera, registry, audit log, MCP client, and Ollama agent, and serves `GET /state`, `GET /scene`, `GET /frame`, and `WS /audit`.
+3. `mcp/client.py` asks the MCP server for its tool list and sends schemas to the local Ollama model.
+4. Ollama selects an MCP tool; `mcp/server.py` validates and dispatches it through `skill_registry.py`.
 5. A primitive skill calls a direct method such as `robot.jog()`. A VLA skill calls `robot.run_policy()` with its configured prompt and checkpoint.
-6. The skill returns `SkillResult`; the judge may report success or invoke `recovery.py`.
+6. The skill returns `SkillResult`; the agent uses that result to continue or produce its final reply.
 7. Every tool call is written by `audit/log.py` and streamed back to the UI over `/audit`.
 
 ```text
-Web UI -> FastAPI server -> Judge -> Skill registry -> Primitive or VLA skill
+Web UI -> FastAPI server -> Claude MCP agent -> MCP server -> Skill registry -> Skill
                               |                |              |
                               |                |              +-> RobotController -> LeRobot/SO-101
                               |                +-> Perception -> RealSense/CV
@@ -187,7 +201,7 @@ Web UI -> FastAPI server -> Judge -> Skill registry -> Primitive or VLA skill
 | `perception/` | Camera capture and scene/body/object observations | `realsense.py`, `face.py`, `hands.py`, `gaze.py`, `objects.py` |
 | `integrations/` | External non-robot services | `calendar.py` |
 | `audit/` | Append-only JSONL event history and UI subscribers | `log.py` |
-| `mcp/` | Optional future MCP exposure of the same bounded tools | `robot_server.py` |
+| `mcp/` | Canonical MCP skill server and model-facing client | `server.py`, `client.py` |
 | `types.py` | Shared data contracts used across layers | `SkillResult`, `SceneObservation`, `DetectedObject`, `Medication` |
 | `config.py` | Loads `.env`, `robot.yaml`, and `skills.yaml` | Cached configuration accessors |
 
@@ -196,7 +210,7 @@ Web UI -> FastAPI server -> Judge -> Skill registry -> Primitive or VLA skill
 `config/skills.yaml` is the source of truth for what the agent may run.
 `SkillRegistry` imports the configured class and verifies that its declared kind matches:
 
-- `PrimitiveSkill`: deterministic direct command, currently `move_up` and `move_down`.
+- `PrimitiveSkill`: deterministic command or safe dummy integration skill.
 - `VLASkill`: learned manipulation behavior driven by a prompt and policy checkpoint.
 
 All skills implement `run()`, `check_success()`, and `reset()`, and return the same
@@ -209,16 +223,17 @@ All skills implement `run()`, `check_success()`, and `reset()`, and return the s
 | Diffusion + camera | `nursearm/perception/` | Produce observations or targets consumed by a skill |
 | VLA + robot | `nursearm/skills/`, `nursearm/robot/`, `config/skills.yaml` | Accept a prompt/target and return `SkillResult` |
 | UI | `nursearm/interface/` | Use `POST /chat`, `GET /health`, and WebSocket `/audit` |
-| Agentic connection | `nursearm/orchestrator/` | Select and invoke registry skills without raw joint access |
+| Agentic connection | `nursearm/mcp/`, `nursearm/orchestrator/` | Select and invoke registry skills without raw joint access |
 
 Shared contracts belong in `types.py`. Hardware-specific code stays in `robot/`; camera-specific code stays in `perception/`. This keeps parallel work from colliding.
 
 ### What is implemented versus stubbed
 
-Implemented now: package/config loading, FastAPI wiring, Claude tool loop, skill registry,
-mock robot/perception mode, primitive mock moves, audit logging, and the basic web UI.
+Implemented now: package/config loading, FastAPI wiring, MCP server/client discovery,
+Claude MCP tool loop, dummy skills, skill registry, mock robot/perception mode,
+primitive mock moves, audit logging, and the basic web UI.
 
-Still requiring real implementation or trained artifacts: Cartesian robot jogging, home/gripper/servo commands, VLA checkpoints, camera landmark/object detectors, visual success checks, and the optional MCP server.
+Still requiring real implementation or trained artifacts: Cartesian robot jogging, home/gripper/servo commands, VLA checkpoints, camera landmark/object detectors, visual success checks, and production authentication for remote MCP access.
 
 ---
 
