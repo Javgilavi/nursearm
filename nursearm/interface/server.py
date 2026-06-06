@@ -5,7 +5,8 @@ Endpoints:
   GET  /static/{path}   -> static files (app.js, styles.css)
   GET  /state           -> current status + scene summary
   GET  /scene           -> current RGB-D scene summary
-  GET  /frame           -> latest camera frame as PNG
+  GET  /stream          -> MJPEG live camera stream (browser-native, no JS polling)
+  GET  /frame           -> single latest JPEG frame
   POST /chat            -> {"text": ...}; runs local Ollama agent via MCP, returns reply
   WS   /audit           -> streams audit events live
   GET  /health          -> liveness + Ollama model status
@@ -19,6 +20,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import subprocess
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -26,7 +29,7 @@ from typing import Any
 import cv2
 import numpy as np
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
 from nursearm.audit.log import AuditLog
@@ -37,11 +40,24 @@ from nursearm.perception.realsense import Perception
 from nursearm.robot.controller import RobotController
 from nursearm.types import SceneObservation
 
+class _NoiseFilter(logging.Filter):
+    """Drop repetitive 404s from external tools polling our server."""
+    _SKIP = ("/api/boxes/", "/ws/robot_state")
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        msg = record.getMessage()
+        return not any(pat in msg for pat in self._SKIP)
+
+
 logging.basicConfig(level=logging.INFO)
+logging.getLogger("uvicorn.access").addFilter(_NoiseFilter())
 logger = logging.getLogger(__name__)
 
 MOCK = os.getenv("NURSEARM_MOCK", "0") == "1"
 WEB_DIR = Path(__file__).resolve().parent / "web"
+
+_JPEG_PARAMS = [cv2.IMWRITE_JPEG_QUALITY, 75]
+_BLANK_FRAME = np.zeros((480, 640, 3), dtype=np.uint8)
 
 
 class ChatIn(BaseModel):
@@ -61,19 +77,53 @@ class AppState:
         self.loop: asyncio.AbstractEventLoop | None = None
         self._ws_clients: set[WebSocket] = set()
         self._latest_scene: SceneObservation | None = None
-        self._latest_frame: np.ndarray | None = None
+        self._latest_jpg: bytes = self._encode_jpg(_BLANK_FRAME)
+        self._camera_task: asyncio.Task | None = None
         self.audit.subscribe(self._broadcast)
 
     async def start(self) -> None:
         await self.mcp.connect()
         self.agent = OllamaMCPAgent(self.mcp, audit=self.audit)
+        self._camera_task = asyncio.create_task(self._camera_loop())
 
     async def close(self) -> None:
+        if self._camera_task is not None:
+            self._camera_task.cancel()
         if self.agent is not None:
             await self.agent.close()
         await self.mcp.close()
         self.robot.disconnect()
         self.perception.close()
+
+    # -- camera background task --------------------------------------------------
+
+    async def _camera_loop(self) -> None:
+        """Continuously capture from the camera and store the latest JPEG."""
+        while True:
+            try:
+                jpg = await asyncio.to_thread(self._capture_jpg)
+                self._latest_jpg = jpg
+            except Exception as exc:
+                logger.debug("camera capture error: %s", exc)
+            await asyncio.sleep(1 / 30)  # target 30 fps capture
+
+    def _capture_jpg(self) -> bytes:
+        try:
+            color, _ = self.perception.frames()
+        except Exception:
+            color = None
+        if color is None or color.size == 0:
+            color = _BLANK_FRAME
+        if self.perception.mock and not self.perception.has_real_camera:
+            color = self._make_mock_frame(color)
+        return self._encode_jpg(color)
+
+    @staticmethod
+    def _encode_jpg(frame: np.ndarray) -> bytes:
+        ok, buf = cv2.imencode(".jpg", frame, _JPEG_PARAMS)
+        return bytes(buf) if ok else b""
+
+    # -- scene / state -----------------------------------------------------------
 
     def _broadcast(self, event: dict[str, Any]) -> None:
         if self.loop is None:
@@ -87,10 +137,8 @@ class AppState:
         except Exception as exc:
             logger.exception("scene observation failed")
             self._latest_scene = None
-            self._latest_frame = None
             return {"ok": False, "error": str(exc), "mock": MOCK, "scene": None}
         self._latest_scene = scene
-        self._latest_frame = scene.frame
         payload = scene.summary()
         payload["ok"] = True
         payload["mock"] = MOCK
@@ -111,31 +159,6 @@ class AppState:
             "audit_count": len(self.audit.read_all()),
         }
 
-    def get_frame_png(self) -> bytes:
-        color = self._latest_frame
-        if color is None:
-            try:
-                color, _ = self.perception.frames()
-            except Exception as exc:
-                logger.exception("frame capture failed")
-                color = np.zeros((480, 640, 3), dtype=np.uint8)
-                cv2.putText(
-                    color,
-                    f"Camera unavailable: {exc}",
-                    (24, 240),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6,
-                    (255, 255, 255),
-                    2,
-                    cv2.LINE_AA,
-                )
-                return self._encode_png(color)
-        if color is None or color.size == 0:
-            color = np.zeros((480, 640, 3), dtype=np.uint8)
-        if self.perception.mock and not self.perception.has_real_camera:
-            color = self._make_mock_frame(color)
-        return self._encode_png(color)
-
     @staticmethod
     def _make_mock_frame(color: np.ndarray) -> np.ndarray:
         frame = color.copy()
@@ -150,20 +173,40 @@ class AppState:
         cv2.putText(frame, "Notebook", (380, 405), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
         return frame
 
-    @staticmethod
-    def _encode_png(frame: np.ndarray) -> bytes:
-        ok, buf = cv2.imencode(".png", frame)
-        if not ok:
-            raise RuntimeError("failed to encode camera frame")
-        return buf.tobytes()
-
 
 state: AppState | None = None
+
+
+def _ensure_ollama() -> None:
+    """Start `ollama serve` in the background if it is not already running."""
+    import httpx
+    try:
+        httpx.get("http://127.0.0.1:11434/api/tags", timeout=1.0)
+        logger.info("Ollama already running.")
+        return
+    except Exception:
+        pass
+    logger.info("Starting Ollama in the background...")
+    subprocess.Popen(  # noqa: S603
+        ["ollama", "serve"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    for _ in range(20):
+        time.sleep(0.5)
+        try:
+            httpx.get("http://127.0.0.1:11434/api/tags", timeout=1.0)
+            logger.info("Ollama is up.")
+            return
+        except Exception:
+            pass
+    logger.warning("Ollama did not become ready in 10 s; continuing anyway.")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global state
+    await asyncio.to_thread(_ensure_ollama)
     state = AppState()
     state.loop = asyncio.get_running_loop()
     await state.start()
@@ -203,9 +246,32 @@ async def scene_view() -> dict[str, Any]:
     return state.get_scene_summary()
 
 
+@app.get("/stream")
+async def stream_view() -> StreamingResponse:
+    """MJPEG stream — browsers display this natively in an <img> tag."""
+    async def generate():
+        while True:
+            jpg = state._latest_jpg
+            if jpg:
+                yield (
+                    b"--frame\r\n"
+                    b"Content-Type: image/jpeg\r\n\r\n"
+                    + jpg
+                    + b"\r\n"
+                )
+            await asyncio.sleep(1 / 25)  # push at 25 fps to browser
+
+    return StreamingResponse(
+        generate(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+        headers={"Cache-Control": "no-cache, no-store"},
+    )
+
+
 @app.get("/frame")
 async def frame_view() -> Response:
-    return Response(content=state.get_frame_png(), media_type="image/png")
+    """Single latest JPEG frame (for snapshot use)."""
+    return Response(content=state._latest_jpg, media_type="image/jpeg")
 
 
 @app.post("/chat")

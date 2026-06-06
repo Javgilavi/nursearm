@@ -8,18 +8,16 @@ const cameraFrames = [
 ];
 const chatForm = document.getElementById("chat-form");
 const chatInput = document.getElementById("chat-input");
+const sendButton = document.querySelector(".send-button");
 const chatMessages = document.getElementById("chat-messages");
 const promptChips = document.querySelectorAll("[data-prompt]");
 
+// ── Layout persistence ────────────────────────────────────────────────────────
+
 const STORAGE_KEY = "nursearm.ui.sizes";
-const DEFAULTS = {
-  left: 0.6,
-  top: 0.5,
-};
+const DEFAULTS = { left: 0.6, top: 0.5 };
 
-const state = loadSizes();
-
-function loadSizes() {
+const sizes = (() => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return { ...DEFAULTS };
@@ -31,56 +29,14 @@ function loadSizes() {
   } catch {
     return { ...DEFAULTS };
   }
-}
+})();
 
 function saveSizes() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(sizes));
 }
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
-}
-
-function refreshFrames() {
-  const stamp = Date.now();
-  cameraFrames.forEach((frame) => {
-    frame.src = `/frame?ts=${stamp}`;
-  });
-}
-
-function appendMessage(role, content) {
-  const node = document.createElement("article");
-  node.className = `message ${role}`;
-  node.setAttribute("aria-label", role === "user" ? "Your message" : "Assistant message");
-  node.textContent = content;
-  chatMessages.appendChild(node);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
-}
-
-function sendChat(text) {
-  return fetch("/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text }),
-  })
-    .then(async (response) => {
-      const payload = await response.json();
-      if (!response.ok) {
-        appendMessage("assistant", `Error: ${payload.error || "request failed"}`);
-        return;
-      }
-      appendMessage("user", text);
-      appendMessage("assistant", payload.reply);
-      refreshFrames();
-    });
-}
-
-async function onSubmit(event) {
-  event.preventDefault();
-  const text = chatInput.value.trim();
-  if (!text) return;
-  chatInput.value = "";
-  await sendChat(text);
 }
 
 function applyLayoutSizes() {
@@ -89,14 +45,14 @@ function applyLayoutSizes() {
   const minRight = 340;
   const gutter = 12;
   const maxLeft = Math.max(minLeft, rect.width - minRight - gutter);
-  const leftPx = clamp(rect.width * state.left, minLeft, maxLeft);
+  const leftPx = clamp(rect.width * sizes.left, minLeft, maxLeft);
   layout.style.setProperty("--layout-left", `${leftPx}px`);
 
   const cameraRect = cameraColumn.getBoundingClientRect();
   const minTop = 220;
   const minBottom = 220;
   const maxTop = Math.max(minTop, cameraRect.height - minBottom - gutter);
-  const topPx = clamp(cameraRect.height * state.top, minTop, maxTop);
+  const topPx = clamp(cameraRect.height * sizes.top, minTop, maxTop);
   layout.style.setProperty("--layout-top", `${topPx}px`);
 }
 
@@ -106,8 +62,8 @@ function startResize(orientation, event) {
   const startY = event.clientY;
   const layoutRect = layout.getBoundingClientRect();
   const cameraRect = cameraColumn.getBoundingClientRect();
-  const startLeft = state.left;
-  const startTop = state.top;
+  const startLeft = sizes.left;
+  const startTop = sizes.top;
 
   const onMove = (moveEvent) => {
     if (orientation === "vertical") {
@@ -116,14 +72,14 @@ function startResize(orientation, event) {
       const gutter = 12;
       const maxLeft = Math.max(minLeft, layoutRect.width - minRight - gutter);
       const nextLeft = clamp(startLeft * layoutRect.width + (moveEvent.clientX - startX), minLeft, maxLeft);
-      state.left = nextLeft / layoutRect.width;
+      sizes.left = nextLeft / layoutRect.width;
     } else {
       const minTop = 220;
       const minBottom = 220;
       const gutter = 12;
       const maxTop = Math.max(minTop, cameraRect.height - minBottom - gutter);
       const nextTop = clamp(startTop * cameraRect.height + (moveEvent.clientY - startY), minTop, maxTop);
-      state.top = nextTop / cameraRect.height;
+      sizes.top = nextTop / cameraRect.height;
     }
     applyLayoutSizes();
     saveSizes();
@@ -142,6 +98,82 @@ function startResize(orientation, event) {
 
 cameraSplit.addEventListener("pointerdown", (event) => startResize("horizontal", event));
 layoutSplit.addEventListener("pointerdown", (event) => startResize("vertical", event));
+window.addEventListener("resize", applyLayoutSizes);
+
+// ── Camera ────────────────────────────────────────────────────────────────────
+// Point both panels at the MJPEG stream — the browser handles it natively.
+// No JS polling loop needed.
+
+function startCameras() {
+  cameraFrames.forEach((img) => {
+    img.src = "/stream";
+  });
+}
+
+// ── Chat ──────────────────────────────────────────────────────────────────────
+
+let loadingBubble = null;
+
+function setLoading(on) {
+  chatInput.disabled = on;
+  sendButton.disabled = on;
+}
+
+function appendMessage(role, content) {
+  const node = document.createElement("article");
+  node.className = `message ${role}`;
+  node.setAttribute("aria-label", role === "user" ? "Your message" : "Assistant message");
+  node.textContent = content;
+  chatMessages.appendChild(node);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  return node;
+}
+
+function showSpinner() {
+  loadingBubble = document.createElement("article");
+  loadingBubble.className = "message assistant loading";
+  loadingBubble.textContent = "Thinking…";
+  chatMessages.appendChild(loadingBubble);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function hideSpinner() {
+  if (loadingBubble) {
+    loadingBubble.remove();
+    loadingBubble = null;
+  }
+}
+
+async function onSubmit(event) {
+  event.preventDefault();
+  const text = chatInput.value.trim();
+  if (!text) return;
+
+  chatInput.value = "";
+  appendMessage("user", text);
+  setLoading(true);
+  showSpinner();
+
+  try {
+    const response = await fetch("/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    const payload = await response.json();
+    hideSpinner();
+    appendMessage(
+      "assistant",
+      response.ok ? payload.reply : `Error: ${payload.detail || payload.error || "request failed"}`
+    );
+  } catch {
+    hideSpinner();
+    appendMessage("assistant", "Cannot reach the NurseArm backend.");
+  } finally {
+    setLoading(false);
+    chatInput.focus();
+  }
+}
 
 chatForm.addEventListener("submit", onSubmit);
 promptChips.forEach((chip) => {
@@ -151,10 +183,10 @@ promptChips.forEach((chip) => {
   });
 });
 
-window.addEventListener("resize", applyLayoutSizes);
+// ── Boot ──────────────────────────────────────────────────────────────────────
+
 window.addEventListener("load", () => {
   applyLayoutSizes();
-  refreshFrames();
+  startCameras();
+  chatInput.focus();
 });
-
-setInterval(refreshFrames, 3000);

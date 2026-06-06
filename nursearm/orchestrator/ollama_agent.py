@@ -81,7 +81,18 @@ class OllamaMCPAgent:
             tool_calls = message.get("tool_calls") or []
 
             if not tool_calls:
-                reply = self._clean_reply(str(message.get("content") or ""))
+                content = str(message.get("content") or "")
+                # qwen3 sometimes outputs the tool call as plain-text JSON instead
+                # of using the proper function-call format — recover and execute it.
+                recovered = self._recover_tool_call(content)
+                if recovered:
+                    name, arguments = recovered
+                    result = await self.mcp.call_tool(name, arguments)
+                    self._log({"event": "mcp_tool", "tool": name, "args": arguments, "result": result})
+                    self.messages.append({"role": "tool", "tool_name": name, "content": json.dumps(result)})
+                    continue
+
+                reply = self._clean_reply(content)
                 self._log({"event": "report", "text": reply})
                 self._trim_history()
                 return reply or "The local model returned an empty response."
@@ -115,6 +126,32 @@ class OllamaMCPAgent:
     def _trim_history(self) -> None:
         if len(self.messages) > 41:
             self.messages = [self.messages[0], *self.messages[-40:]]
+
+    @staticmethod
+    def _recover_tool_call(content: str) -> tuple[str, dict] | None:
+        """Detect a tool call printed as plain-text JSON and return (name, args).
+
+        qwen3:4b sometimes skips the function-call wire format and just writes
+        {"name": "...", "arguments": {...}} (or "args") in the message content.
+        """
+        cleaned = THINK_BLOCK_RE.sub("", content).strip()
+        # Candidates: the whole content, then any {...} substrings found in it.
+        candidates = [cleaned] + re.findall(r"\{[^{}]+\}", cleaned, re.DOTALL)
+        for candidate in candidates:
+            try:
+                data = json.loads(candidate)
+            except (json.JSONDecodeError, ValueError):
+                continue
+            if not isinstance(data, dict):
+                continue
+            name = data.get("name") or data.get("tool")
+            if not name or not isinstance(name, str):
+                continue
+            args = data.get("arguments") or data.get("args") or data.get("parameters") or {}
+            if not isinstance(args, dict):
+                continue
+            return name, args
+        return None
 
     @staticmethod
     def _clean_reply(content: str) -> str:
