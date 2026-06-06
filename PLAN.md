@@ -86,7 +86,7 @@ messages the robot from their own phone — "API in the real world."
 
 ## Demo-day checklist
 
-- [ ] `.env` has a real `ANTHROPIC_API_KEY`; `ANTHROPIC_API_KEY` quota checked.
+- [ ] Ollama is running locally and `qwen3:4b` is installed.
 - [ ] `config/robot.yaml`: ports, ids, and a **non-identity hand-eye transform** set.
 - [ ] At least one skill's `policy_path` set in `config/skills.yaml` and loads.
 - [ ] `test_perception.py` shows correct 3D points under demo lighting.
