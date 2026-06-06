@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from typing import Any
 
 import httpx
@@ -19,9 +20,14 @@ Use the available tools when a request requires a NurseArm capability.
 Select only tools relevant to the user's request.
 Never claim an action succeeded until its tool result reports success.
 Never invent tools, raw motor commands, medication details, or completed actions.
+After a tool call, state only facts explicitly present in the tool result.
 Ask for missing safety-critical information before running a high-risk skill.
+Do not reveal analysis, chain-of-thought, or <think> content.
 Keep final answers concise and clear.
 """
+
+
+THINK_BLOCK_RE = re.compile(r"<think>.*?</think>", flags=re.DOTALL | re.IGNORECASE)
 
 
 class OllamaUnavailableError(RuntimeError):
@@ -75,7 +81,7 @@ class OllamaMCPAgent:
             tool_calls = message.get("tool_calls") or []
 
             if not tool_calls:
-                reply = str(message.get("content") or "").strip()
+                reply = self._clean_reply(str(message.get("content") or ""))
                 self._log({"event": "report", "text": reply})
                 self._trim_history()
                 return reply or "The local model returned an empty response."
@@ -109,6 +115,13 @@ class OllamaMCPAgent:
     def _trim_history(self) -> None:
         if len(self.messages) > 41:
             self.messages = [self.messages[0], *self.messages[-40:]]
+
+    @staticmethod
+    def _clean_reply(content: str) -> str:
+        cleaned = THINK_BLOCK_RE.sub("", content)
+        if "</think>" in cleaned.lower():
+            cleaned = re.split(r"</think>", cleaned, flags=re.IGNORECASE)[-1]
+        return cleaned.strip()
 
     async def model_status(self) -> dict[str, Any]:
         try:

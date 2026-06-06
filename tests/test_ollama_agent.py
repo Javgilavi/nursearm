@@ -77,9 +77,7 @@ async def test_agent_calls_mcp_tool_and_returns_final_reply(monkeypatch: pytest.
         await http.aclose()
 
     assert reply == "Inspection completed."
-    assert mcp.calls == [
-        ("skill1_check_environment", {"request": "inspect the room"})
-    ]
+    assert mcp.calls == [("skill1_check_environment", {"request": "inspect the room"})]
     assert requests[0]["model"] == "qwen3:4b"
     assert requests[0]["tools"][0]["function"]["name"] == "skill1_check_environment"
     assert requests[1]["messages"][-1]["content"] == (
@@ -100,3 +98,20 @@ async def test_agent_reports_unavailable_ollama() -> None:
             await agent.handle("Hello")
     finally:
         await http.aclose()
+
+
+@pytest.mark.parametrize(
+    ("content", "expected"),
+    [
+        (
+            "<think>I should call a tool.</think>\nThe skill completed.",
+            "The skill completed.",
+        ),
+        (
+            "Internal reasoning that should not be shown.</think>\nThe skill completed.",
+            "The skill completed.",
+        ),
+    ],
+)
+def test_clean_reply_removes_reasoning(content: str, expected: str) -> None:
+    assert OllamaMCPAgent._clean_reply(content) == expected
