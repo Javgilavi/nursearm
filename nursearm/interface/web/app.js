@@ -265,8 +265,23 @@ promptChips.forEach((chip) => {
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 
+async function loadRemoteUrl() {
+  try {
+    const r = await fetch("/health");
+    const data = await r.json();
+    if (data.ngrok_url) {
+      const section = document.getElementById("remote-access");
+      const link = document.getElementById("ngrok-link");
+      link.href = data.ngrok_url;
+      link.textContent = data.ngrok_url.replace("https://", "");
+      section.hidden = false;
+    }
+  } catch { /* server not ready yet — silent */ }
+}
+
 window.addEventListener("load", () => {
   applyLayoutSizes();
   startCameras();
   chatInput.focus();
+  loadRemoteUrl();
 });

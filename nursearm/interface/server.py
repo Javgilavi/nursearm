@@ -224,6 +224,7 @@ class AppState:
 
 
 state: AppState | None = None
+_ngrok_url: str | None = None
 
 
 def _ensure_ollama() -> None:
@@ -252,10 +253,52 @@ def _ensure_ollama() -> None:
     logger.warning("Ollama did not become ready in 10 s; continuing anyway.")
 
 
+def _ensure_ngrok(port: int = 8000) -> str | None:
+    """Start ngrok if not running and return the public HTTPS URL. No-op if ngrok is not installed."""
+    import shutil
+    import httpx
+
+    if not shutil.which("ngrok"):
+        return None
+
+    # Already running? Just grab the URL.
+    try:
+        r = httpx.get("http://127.0.0.1:4040/api/tunnels", timeout=1.0)
+        for t in r.json().get("tunnels", []):
+            if t.get("proto") == "https":
+                return t["public_url"]
+    except Exception:
+        pass
+
+    logger.info("Starting ngrok tunnel on port %d...", port)
+    subprocess.Popen(  # noqa: S603
+        ["ngrok", "http", str(port)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    for _ in range(20):
+        time.sleep(0.5)
+        try:
+            r = httpx.get("http://127.0.0.1:4040/api/tunnels", timeout=1.0)
+            for t in r.json().get("tunnels", []):
+                if t.get("proto") == "https":
+                    return t["public_url"]
+        except Exception:
+            pass
+
+    logger.warning("ngrok did not expose a tunnel in 10 s — phone access unavailable.")
+    return None
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global state
+    global state, _ngrok_url
     await asyncio.to_thread(_ensure_ollama)
+    _ngrok_url = await asyncio.to_thread(_ensure_ngrok)
+    if _ngrok_url:
+        logger.info("=" * 56)
+        logger.info("  Phone / remote access:  %s", _ngrok_url)
+        logger.info("=" * 56)
     state = AppState()
     state.loop = asyncio.get_running_loop()
     await state.start()
@@ -282,7 +325,7 @@ async def static_file(path: str) -> FileResponse:
 @app.get("/health")
 async def health() -> dict[str, Any]:
     ollama = await state.agent.model_status() if state.agent else {"available": False}
-    return {"ok": True, "mock": MOCK, "ollama": ollama}
+    return {"ok": True, "mock": MOCK, "ollama": ollama, "ngrok_url": _ngrok_url}
 
 
 @app.get("/state")
