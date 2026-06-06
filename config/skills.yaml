@@ -1,0 +1,43 @@
+# Skill registry. name -> class + description (the judge reads the description to choose)
+# + policy_path (the trained checkpoint). Set policy_path after scripts/train_skill.py.
+
+skills:
+  dispense_pills:
+    class: carearm.skills.dispense_pills.DispensePills
+    description: >
+      Find today's prescribed pill among the pills on the table, pick it up, and place
+      it in the cup. Use when the person asks for their medication. Args: {pill: <name>}.
+    task: "pick the correct pill and place it in the cup"
+    policy_path: null   # e.g. outputs/train/act_dispense_pills/checkpoints/060000/pretrained_model
+    enabled: true
+
+  feed_person:
+    class: carearm.skills.feed_person.FeedPerson
+    description: >
+      Scoop food from the bowl and bring the spoon to the person's mouth, stopping safely
+      short. Use when the person asks to be fed. Args: {food: <name>}.
+    task: "scoop food and bring it to the person's mouth"
+    policy_path: null
+    enabled: true
+
+  gaze_pick:
+    class: carearm.skills.gaze_pick.GazePick
+    description: >
+      Pick up the object the person is looking at. Use when they say "give me that" while
+      looking at an item. (Stretch skill.)
+    task: "pick up the object the person is looking at"
+    policy_path: null
+    enabled: false   # enable once trained — keeps the judge's choices to working skills
+
+  hand_handoff:
+    class: carearm.skills.hand_handoff.HandHandoff
+    description: >
+      Place the held object safely into the person's open palm. Use to hand something over.
+    task: "place the object into the person's open hand"
+    policy_path: null
+    enabled: false
+
+# Used by integrations.calendar.MockCalendarClient when USE_GOOGLE_CALENDAR != 1.
+mock_medication_schedule:
+  - {name: Aspirin,   dose: 100mg,  time: "09:00"}
+  - {name: Metformin, dose: 500mg,  time: "09:00"}

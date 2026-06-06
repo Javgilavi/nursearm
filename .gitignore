@@ -1,0 +1,25 @@
+# Secrets
+.env
+credentials.json
+token.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Data, datasets, checkpoints, logs
+data/*
+!data/.gitkeep
+outputs/
+*.jsonl
+wandb/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

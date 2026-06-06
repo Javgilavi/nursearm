@@ -1,0 +1,59 @@
+[project]
+name = "carearm"
+version = "0.1.0"
+description = "Assistive SO-101 robot arm driven by an LLM orchestrator (judge + skills + RGB-D perception)."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=0.40",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "websockets>=12",
+    "python-dotenv>=1.0",
+    "pyyaml>=6.0",
+    "numpy>=1.26",
+    "opencv-python>=4.9",
+    "pydantic>=2.7",
+]
+
+# NOTE on LeRobot: it is NOT a hard dependency here on purpose. LeRobot pins torch to a
+# CUDA wheel index, which makes it painful as a transitive dep. Install it into the SAME
+# venv as CareArm (see README "Installing LeRobot"). The [robot] extra below adds the
+# camera/vision deps that DO resolve cleanly.
+[project.optional-dependencies]
+robot = [
+    "pyrealsense2>=2.55",
+    "mediapipe>=0.10",
+]
+voice = [
+    "deepgram-sdk>=3.5",
+]
+calendar = [
+    "google-api-python-client>=2.130",
+    "google-auth-oauthlib>=1.2",
+    "google-auth>=2.30",
+]
+mcp = [
+    "mcp>=1.0",
+]
+dev = [
+    "ruff>=0.6",
+    "pytest>=8.0",
+]
+
+[project.scripts]
+carearm-serve = "carearm.interface.server:app"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["carearm*"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

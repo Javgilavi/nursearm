@@ -1,0 +1,28 @@
+# SO-101 + camera configuration. Fill in after calibration (scripts/calibrate.py).
+
+# Serial ports (find with `lerobot-find-port`, one arm at a time)
+follower_port: /dev/ttyACM0
+leader_port: /dev/ttyACM1
+
+# Calibration ids (set during `lerobot-calibrate ... --robot.id=...`) — reuse everywhere
+follower_id: follower
+leader_id: leader
+
+# Camera config string passed to lerobot CLIs (--robot.cameras=...).
+# For the RGB-D scene camera, perception/realsense.py opens RealSense directly;
+# this opencv entry is the camera LeRobot records/rolls out with.
+camera_arg: "{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}}"
+
+# Safe-stop: halt the arm if a tracked body part jumps more than this (metres) per frame.
+safe_stop_max_jump_m: 0.08
+
+# Hand-eye transform: 4x4 matrix mapping CAMERA frame -> ROBOT BASE frame.
+# Identity = NOT calibrated (servo_to will aim wrong). Run hand-eye calibration and paste here.
+hand_eye_transform:
+  - [1.0, 0.0, 0.0, 0.0]
+  - [0.0, 1.0, 0.0, 0.0]
+  - [0.0, 0.0, 1.0, 0.0]
+  - [0.0, 0.0, 0.0, 1.0]
+
+# Home joint pose (safe rest position) — fill with values read during calibration.
+# home_pose: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
