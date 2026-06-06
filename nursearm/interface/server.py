@@ -132,7 +132,7 @@ class AppState:
                 return self._encode_png(color)
         if color is None or color.size == 0:
             color = np.zeros((480, 640, 3), dtype=np.uint8)
-        if self.perception.mock:
+        if self.perception.mock and not self.perception.has_real_camera:
             color = self._make_mock_frame(color)
         return self._encode_png(color)
 

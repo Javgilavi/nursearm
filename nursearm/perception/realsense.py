@@ -41,7 +41,9 @@ class Perception:
     """Wraps a RealSense pipeline and the landmark extractors.
 
     For development without hardware, construct with ``mock=True`` to return empty/
-    canned observations so the judge loop and UI can run on a laptop.
+    canned observations so the judge loop and UI can run on a laptop.  When mock=True,
+    a laptop webcam (index 0) is opened automatically if one is available so the camera
+    tile in the UI shows a real feed rather than a synthetic placeholder.
     """
 
     def __init__(self, mock: bool = False) -> None:
@@ -49,9 +51,22 @@ class Perception:
         self._pipeline = None
         self._align = None
         self._intrinsics = None
+        self._cap = None  # cv2.VideoCapture for laptop webcam in mock mode
         self._hand_eye = np.array(config.robot_config().get("hand_eye_transform", np.eye(4).tolist()))
         if not mock:
             self._start()
+        else:
+            self._start_webcam()
+
+    def _start_webcam(self) -> None:
+        import cv2
+        cap = cv2.VideoCapture(0)
+        if cap.isOpened():
+            self._cap = cap
+            logger.info("Laptop webcam (index 0) opened for mock-mode camera feed.")
+        else:
+            cap.release()
+            logger.info("No webcam found on index 0; using synthetic frames.")
 
     def _start(self) -> None:
         import pyrealsense2 as rs  # lazy import — only needed with real hardware
@@ -67,10 +82,21 @@ class Perception:
         )
         logger.info("RealSense started (color+depth, aligned).")
 
+    @property
+    def has_real_camera(self) -> bool:
+        """True when we have an open webcam (mock mode) or RealSense (real mode)."""
+        if self.mock:
+            return self._cap is not None and self._cap.isOpened()
+        return self._pipeline is not None
+
     # -- raw capture -------------------------------------------------------------
     def frames(self) -> tuple[np.ndarray, np.ndarray]:
-        """Return (color_bgr, depth_m) with depth aligned to color. (mock -> zeros)."""
+        """Return (color_bgr, depth_m) with depth aligned to color."""
         if self.mock:
+            if self._cap is not None and self._cap.isOpened():
+                ok, frame = self._cap.read()
+                if ok:
+                    return frame, np.zeros((frame.shape[0], frame.shape[1]), np.float32)
             return np.zeros((480, 640, 3), np.uint8), np.zeros((480, 640), np.float32)
         import pyrealsense2 as rs  # noqa: F401
 
@@ -132,3 +158,6 @@ class Perception:
     def close(self) -> None:
         if self._pipeline is not None:
             self._pipeline.stop()
+        if self._cap is not None:
+            self._cap.release()
+            self._cap = None
