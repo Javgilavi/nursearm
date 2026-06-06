@@ -26,19 +26,18 @@ here to assistive care.
 | VLA | `gaze_pick` | Picks up whatever the person is looking at | stretch |
 | VLA | `hand_handoff` | Places an object safely into an open palm | stretch |
 
-You talk to it from a web UI (chat + mic) and watch the judge's reasoning and every
-robot action stream into a live **audit log** — the healthcare safety story, built in
-from minute one.
+The current web UI is intentionally a basic text chat. It sends messages to the local
+Qwen agent through FastAPI; backend tool calls continue to be recorded in the audit log.
 
 ---
 
 ## Architecture (one screen)
 
 ```
-  speech / text  ─▶  INTERFACE (FastAPI + web UI, optional WhatsApp/Telegram via MCP)
+  text chat      ─▶  INTERFACE (FastAPI + basic web UI, optional WhatsApp/Telegram via MCP)
                           │  user intent
                           ▼
-                     JUDGE  (Claude, tool-calling)   ◀── the only thing that "thinks"
+                     AGENT  (Ollama + Qwen3, tool-calling)   ◀── the only thing that "thinks"
                           │  picks a skill, watches, recovers, reports
             ┌─────────────┼──────────────┐
             ▼                            ▼
@@ -103,14 +102,17 @@ then install LeRobot separately with `pip install 'lerobot[feetech]'`.
 ```bash
 cp .env.example .env          # set OLLAMA_MODEL / OLLAMA_URL if needed; leave NURSEARM_MOCK=1
 uv sync --extra dev
+curl -fsSL https://ollama.com/install.sh | sh   # skip if Ollama is already installed
+ollama pull qwen3:4b
 NURSEARM_MOCK=1 nursearm-serve
 # open http://localhost:8000  →  type "give me my morning pills"
 ```
 
+Make sure Ollama is running (`ollama serve` if it is not installed as a service).
 Starting the interface also starts its local MCP server automatically as a managed
 stdio subprocess. Do not start `nursearm-mcp` separately for normal UI development.
 
-In mock mode the robot and camera are stubbed, so the **Claude MCP agent, MCP skill
+In mock mode the robot and camera are stubbed, so the **local Qwen MCP agent, MCP skill
 discovery, dummy skill execution, and audit log all run on a laptop**. Real skills
 remain unavailable until their perception and policy implementations are completed.
 
@@ -118,6 +120,7 @@ remain unavailable until their perception and policy implementations are complet
 
 | Goal | Command | MCP behavior |
 |---|---|---|
+| Run the local model | `ollama serve` | Ollama serves `qwen3:4b` at `http://127.0.0.1:11434` |
 | Run the web interface | `NURSEARM_MOCK=1 uv run uvicorn nursearm.interface.server:app --reload` | FastAPI automatically starts and owns a local stdio MCP subprocess |
 | Test MCP from Codex or Inspector | `NURSEARM_MOCK=1 uv run nursearm-mcp --transport streamable-http` | Standalone HTTP MCP server at `http://127.0.0.1:8000/mcp` |
 | Test MCP without an LLM | `NURSEARM_MOCK=1 uv run python scripts/test_mcp.py` | Test script automatically starts a local stdio MCP subprocess |
@@ -161,15 +164,15 @@ There are two directories named `nursearm`:
 A normal text request follows this path:
 
 1. `interface/web/index.html` sends text to `POST /chat`.
-2. `interface/server.py` owns robot, camera, registry, audit log, MCP client, and Ollama agent, and serves `GET /state`, `GET /scene`, `GET /frame`, and `WS /audit`.
-3. `mcp/client.py` asks the MCP server for its tool list and sends schemas to the local Ollama model.
-4. Ollama selects an MCP tool; `mcp/server.py` validates and dispatches it through `skill_registry.py`.
+2. `interface/server.py` owns robot, camera, registry, audit log, MCP client, and local Ollama agent, and serves `GET /state`, `GET /scene`, `GET /frame`, and `WS /audit`.
+3. `mcp/client.py` asks the MCP server for its tool list and sends those schemas to the local Qwen model.
+4. The local Qwen model selects an MCP tool; `mcp/server.py` validates and dispatches it through `skill_registry.py`.
 5. A primitive skill calls a direct method such as `robot.jog()`. A VLA skill calls `robot.run_policy()` with its configured prompt and checkpoint.
 6. The skill returns `SkillResult`; the agent uses that result to continue or produce its final reply.
 7. Every tool call is written by `audit/log.py` and streamed back to the UI over `/audit`.
 
 ```text
-Web UI -> FastAPI server -> Claude MCP agent -> MCP server -> Skill registry -> Skill
+Web UI -> FastAPI server -> local Qwen MCP agent -> MCP server -> Skill registry -> Skill
                               |                |              |
                               |                |              +-> RobotController -> LeRobot/SO-101
                               |                +-> Perception -> RealSense/CV
@@ -230,7 +233,7 @@ Shared contracts belong in `types.py`. Hardware-specific code stays in `robot/`;
 ### What is implemented versus stubbed
 
 Implemented now: package/config loading, FastAPI wiring, MCP server/client discovery,
-Claude MCP tool loop, dummy skills, skill registry, mock robot/perception mode,
+local Ollama MCP tool loop, dummy skills, skill registry, mock robot/perception mode,
 primitive mock moves, audit logging, and the basic web UI.
 
 Still requiring real implementation or trained artifacts: Cartesian robot jogging, home/gripper/servo commands, VLA checkpoints, camera landmark/object detectors, visual success checks, and production authentication for remote MCP access.
@@ -248,7 +251,7 @@ Still requiring real implementation or trained artifacts: Cartesian robot joggin
   tracked mouth/palm point jumps between frames (the person moved).
 - **Audit trail.** Every judge decision and robot action is logged with a timestamp,
   the skill, and the confidence — required for healthcare, built in from day one.
-- **Open & swappable.** MCP-standard tools; swap Claude for any compliant model; swap the
+- **Open & swappable.** MCP-standard tools; swap the local model or connect any MCP-compatible host; swap the
   SO-101 for a clinical-grade arm by rewriting one file. Total hardware cost < US$1000.
 
 ---
@@ -256,6 +259,6 @@ Still requiring real implementation or trained artifacts: Cartesian robot joggin
 ## Tech stack
 
 LeRobot (SO-101 + ACT/SmolVLA) · Intel RealSense + MediaPipe (RGB-D perception) ·
-Claude via the Anthropic API (orchestrator) · FastAPI + a single-file web UI · Google
+Ollama + Qwen3:4b (local agent) · FastAPI + a basic single-file text chat · Google
 Calendar API · optional Deepgram/ElevenLabs voice and an MCP gateway for phone access ·
 `uv` for packaging.

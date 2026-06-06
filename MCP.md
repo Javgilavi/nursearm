@@ -11,7 +11,7 @@ uv sync --extra dev
 cp .env.example .env
 ```
 
-Only the Claude-backed tests require `ANTHROPIC_API_KEY` in `.env`.
+The browser agent uses local Ollama and requires no external API key or paid tokens.
 
 ## Offline test
 
@@ -40,28 +40,51 @@ NURSEARM_MOCK=1 uv run nursearm-mcp-client \
   --arguments '{"request":"prepare to help me"}'
 ```
 
-## Claude through NurseArm
+## Local Qwen agent through NurseArm
 
-Set `ANTHROPIC_API_KEY` in `.env`, then run:
+Install Ollama, pull the default model, and verify it responds:
 
 ```bash
-NURSEARM_MOCK=1 uv run nursearm-mcp-client \
-  --chat "Please inspect the room before helping me"
+curl -fsSL https://ollama.com/install.sh | sh
+ollama pull qwen3:4b
+ollama run qwen3:4b "Reply with: model ready"
 ```
 
-Claude receives the schemas discovered from MCP and should select
-`skill1_check_environment`.
+Ollama normally runs as a local service. If it is not running, start it in another terminal:
 
-The browser UI uses the same MCP client:
+```bash
+ollama serve
+```
+
+Start the browser UI:
 
 ```bash
 NURSEARM_MOCK=1 uv run uvicorn nursearm.interface.server:app --reload
 ```
 
-Open `http://127.0.0.1:8000`.
+Open `http://127.0.0.1:8000`. FastAPI connects to Ollama at
+`http://127.0.0.1:11434`, starts the NurseArm MCP server automatically over stdio,
+and closes that MCP subprocess during shutdown. No second MCP terminal is needed.
 
-The interface starts `python -m nursearm.mcp.server` automatically over stdio and
-closes it during FastAPI shutdown. You do not need a second MCP terminal for the UI.
+The defaults are configured in `.env`:
+
+```text
+OLLAMA_URL=http://127.0.0.1:11434
+OLLAMA_MODEL=qwen3:4b
+```
+
+Other no-token local options:
+
+| Option | Use when |
+|---|---|
+| `qwen3:4b` through Ollama | Default balance for this laptop and MCP tool selection |
+| `qwen3:8b` through Ollama | Better reasoning with higher latency and memory use |
+| A 2B tool-capable model through Ollama | Lower-memory or CPU-only development |
+| LM Studio | You want a GUI for downloading and comparing local models |
+| llama.cpp | You want direct GGUF deployment and tighter runtime control |
+
+The current backend speaks Ollama's `/api/chat` format. LM Studio or llama.cpp can still
+use the same MCP server, but need their own agent adapter or an Ollama-compatible proxy.
 
 ## Connect Codex
 
@@ -151,10 +174,10 @@ The expected tool result is `skill1 completed`.
 ## Architecture
 
 ```text
-Browser or desktop LLM
+Browser local agent or desktop LLM
         |
         v
-Claude/model host -> MCP client -> NurseArm MCP server
+Ollama/model host -> MCP client -> NurseArm MCP server
                                       |
                                       v
                                 SkillRegistry
