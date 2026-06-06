@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>NurseArm Console</title>
+    <title>NurseArm · 護士臂</title>
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
@@ -11,8 +11,22 @@
       <div class="workspace">
         <aside class="rail" aria-label="System summary">
           <div class="rail-brand">
-            <p class="eyebrow">NurseArm</p>
+            <p class="eyebrow">
+              <!-- Bauhinia flower — Hong Kong emblem -->
+              <svg class="bauhinia-icon" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" fill="currentColor" aria-hidden="true">
+                <g transform="translate(20,20)">
+                  <ellipse rx="5" ry="13" transform="rotate(0)   translate(0,-8)"/>
+                  <ellipse rx="5" ry="13" transform="rotate(72)  translate(0,-8)"/>
+                  <ellipse rx="5" ry="13" transform="rotate(144) translate(0,-8)"/>
+                  <ellipse rx="5" ry="13" transform="rotate(216) translate(0,-8)"/>
+                  <ellipse rx="5" ry="13" transform="rotate(288) translate(0,-8)"/>
+                  <circle r="3"/>
+                </g>
+              </svg>
+              NurseArm
+            </p>
             <h1>Clinical console</h1>
+            <p class="zh-title" lang="zh-HK">護士臂臨床控制台</p>
             <p class="subtitle">Low-noise control surface for bedside assistance.</p>
           </div>
 
@@ -44,6 +58,42 @@
             <p class="rail-foot-label">Focus</p>
             <p>Watch the camera overview, then issue short chat commands.</p>
           </section>
+
+          <!-- Victoria Harbour skyline silhouette -->
+          <div class="hk-skyline" aria-hidden="true">
+            <svg viewBox="0 0 184 52" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
+              <!-- Low buildings far left -->
+              <rect x="0"   y="42" width="7"  height="10"/>
+              <rect x="9"   y="38" width="5"  height="14"/>
+              <rect x="16"  y="34" width="8"  height="18"/>
+              <rect x="26"  y="38" width="5"  height="14"/>
+              <!-- Medium cluster -->
+              <rect x="33"  y="28" width="7"  height="24"/>
+              <rect x="42"  y="32" width="6"  height="20"/>
+              <!-- Stepped building -->
+              <rect x="50"  y="36" width="4"  height="16"/>
+              <rect x="51"  y="30" width="3"  height="6"/>
+              <!-- Bank of China style — pyramid peak -->
+              <polygon points="60,52 60,22 65,13 70,22 70,52"/>
+              <!-- IFC-style tall spire -->
+              <rect x="73"  y="20" width="6"  height="32"/>
+              <polygon points="82,52 82,10 86,3 90,10 90,52"/>
+              <rect x="93"  y="16" width="7"  height="36"/>
+              <!-- Medium-tall flanking -->
+              <rect x="102" y="22" width="8"  height="30"/>
+              <rect x="112" y="26" width="6"  height="26"/>
+              <!-- Another pyramid -->
+              <polygon points="120,52 120,24 124,17 128,24 128,52"/>
+              <!-- Shorter buildings stepping down -->
+              <rect x="130" y="30" width="8"  height="22"/>
+              <rect x="140" y="34" width="7"  height="18"/>
+              <rect x="149" y="38" width="8"  height="14"/>
+              <rect x="159" y="40" width="6"  height="12"/>
+              <rect x="167" y="43" width="8"  height="9"/>
+              <rect x="177" y="46" width="7"  height="6"/>
+            </svg>
+            <p class="hk-credit">香港 · Hong Kong</p>
+          </div>
         </aside>
 
         <main class="layout" id="layout">

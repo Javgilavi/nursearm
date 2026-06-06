@@ -1,19 +1,22 @@
 :root {
-  --bg: #eef4f7;
-  --bg-deep: #dce8ee;
-  --surface: rgba(255, 255, 255, 0.82);
-  --surface-strong: rgba(255, 255, 255, 0.94);
-  --ink: #15242c;
-  --muted: #62717b;
-  --muted-strong: #42535d;
-  --line: rgba(21, 36, 44, 0.12);
-  --line-strong: rgba(21, 36, 44, 0.18);
-  --accent: #236f7f;
-  --accent-deep: #184d59;
-  --accent-soft: rgba(35, 111, 127, 0.12);
-  --safe: #2f7f6f;
-  --warning: #6f7f2f;
-  --shadow: 0 24px 70px rgba(18, 32, 41, 0.12);
+  /* Hong Kong palette — warm ivory, HK red, Lion Rock gold, jade green */
+  --bg: #f3ece0;
+  --bg-deep: #e6dccf;
+  --surface: rgba(255, 249, 241, 0.85);
+  --surface-strong: rgba(255, 249, 241, 0.96);
+  --ink: #1c1208;
+  --muted: #6b5a42;
+  --muted-strong: #4a3a28;
+  --line: rgba(28, 18, 8, 0.10);
+  --line-strong: rgba(28, 18, 8, 0.16);
+  --accent: #c1272d;
+  --accent-deep: #8b1a1e;
+  --accent-soft: rgba(193, 39, 45, 0.10);
+  --gold: #b8860b;
+  --gold-soft: rgba(184, 134, 11, 0.10);
+  --safe: #2e7a62;
+  --warning: #8b6914;
+  --shadow: 0 24px 70px rgba(28, 18, 8, 0.10);
   --radius-xl: 28px;
   --radius-lg: 22px;
   --radius-md: 16px;
@@ -38,9 +41,9 @@ body {
   font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", "Manrope", sans-serif;
   color: var(--ink);
   background:
-    radial-gradient(circle at top left, rgba(35, 111, 127, 0.16), transparent 28%),
-    radial-gradient(circle at top right, rgba(47, 127, 111, 0.1), transparent 26%),
-    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.7), transparent 24%),
+    radial-gradient(circle at top left, rgba(193, 39, 45, 0.07), transparent 30%),
+    radial-gradient(circle at top right, rgba(184, 134, 11, 0.08), transparent 28%),
+    radial-gradient(circle at 50% 0%, rgba(255, 249, 241, 0.7), transparent 24%),
     linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%);
 }
 
@@ -50,8 +53,8 @@ body::before {
   inset: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(21, 36, 44, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(21, 36, 44, 0.025) 1px, transparent 1px);
+    linear-gradient(rgba(28, 18, 8, 0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(28, 18, 8, 0.022) 1px, transparent 1px);
   background-size: 52px 52px;
   mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.9), transparent 90%);
 }
@@ -121,6 +124,17 @@ button {
 
 .eyebrow {
   margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.bauhinia-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--accent);
+  flex-shrink: 0;
+  opacity: 0.85;
 }
 
 h1 {
@@ -129,6 +143,16 @@ h1 {
   line-height: 0.96;
   letter-spacing: -0.03em;
   max-width: 7ch;
+}
+
+.zh-title {
+  margin-top: 4px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  opacity: 0.75;
+  font-family: "PingFang HK", "Noto Sans CJK TC", "Microsoft JhengHei", "Hiragino Sans GB", sans-serif;
 }
 
 .subtitle {
@@ -171,8 +195,8 @@ h1 {
 .rail-remote {
   border-radius: 20px;
   padding: 12px 14px;
-  background: rgba(35, 111, 127, 0.07);
-  border: 1px solid rgba(35, 111, 127, 0.14);
+  background: var(--gold-soft);
+  border: 1px solid rgba(184, 134, 11, 0.18);
 }
 
 .qr-image {
@@ -188,7 +212,7 @@ h1 {
   display: block;
   margin-top: 6px;
   font-size: 0.82rem;
-  color: var(--accent);
+  color: var(--gold);
   word-break: break-all;
   text-decoration: none;
   font-weight: 600;
@@ -203,8 +227,8 @@ h1 {
   margin-top: auto;
   border-radius: 20px;
   padding: 14px;
-  background: rgba(35, 111, 127, 0.07);
-  border: 1px solid rgba(35, 111, 127, 0.12);
+  background: var(--accent-soft);
+  border: 1px solid rgba(193, 39, 45, 0.12);
 }
 
 .rail-foot p:last-child {
@@ -213,6 +237,32 @@ h1 {
   font-size: 0.9rem;
   line-height: 1.45;
 }
+
+/* ── HK skyline decoration ──────────────────────────────────────────────────── */
+
+.hk-skyline {
+  margin-top: auto;
+  text-align: center;
+  color: var(--muted);
+  opacity: 0.28;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.hk-skyline svg {
+  display: block;
+  width: 100%;
+}
+
+.hk-credit {
+  font-size: 0.6rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  margin-top: 4px;
+  font-family: "PingFang HK", "Noto Sans CJK TC", "Microsoft JhengHei", sans-serif;
+}
+
+/* ── Layout ─────────────────────────────────────────────────────────────────── */
 
 .layout {
   flex: 1;
@@ -275,8 +325,8 @@ h2 {
   gap: 8px;
   white-space: nowrap;
   border-radius: 999px;
-  border: 1px solid rgba(47, 127, 111, 0.18);
-  background: rgba(47, 127, 111, 0.08);
+  border: 1px solid rgba(46, 122, 98, 0.18);
+  background: rgba(46, 122, 98, 0.08);
   color: var(--safe);
   font-size: 0.76rem;
   font-weight: 700;
@@ -291,12 +341,12 @@ h2 {
   height: 8px;
   border-radius: 999px;
   background: var(--safe);
-  box-shadow: 0 0 0 6px rgba(47, 127, 111, 0.12);
+  box-shadow: 0 0 0 6px rgba(46, 122, 98, 0.12);
 }
 
 .audit-badge {
-  border-color: rgba(35, 111, 127, 0.18);
-  background: rgba(35, 111, 127, 0.08);
+  border-color: rgba(193, 39, 45, 0.18);
+  background: rgba(193, 39, 45, 0.07);
   color: var(--accent-deep);
 }
 
@@ -306,9 +356,9 @@ h2 {
   border-radius: 22px;
   overflow: hidden;
   background:
-    linear-gradient(135deg, rgba(35, 111, 127, 0.18), rgba(255, 255, 255, 0.48)),
-    linear-gradient(180deg, #d7e5ea, #eef4f7);
-  border: 1px solid rgba(21, 36, 44, 0.08);
+    linear-gradient(135deg, rgba(193, 39, 45, 0.10), rgba(255, 249, 241, 0.48)),
+    linear-gradient(180deg, #e8ddd0, #f3ece0);
+  border: 1px solid rgba(28, 18, 8, 0.08);
   position: relative;
 }
 
@@ -358,6 +408,8 @@ h2 {
   border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
+/* ── Chat panel ─────────────────────────────────────────────────────────────── */
+
 .chat-panel {
   min-width: 0;
   padding-bottom: 16px;
@@ -373,8 +425,8 @@ h2 {
   margin-bottom: 14px;
   padding: 10px 14px;
   border-radius: 999px;
-  background: rgba(35, 111, 127, 0.08);
-  color: var(--accent-deep);
+  background: var(--gold-soft);
+  color: var(--muted-strong);
   font-size: 0.92rem;
   line-height: 1.35;
 }
@@ -387,10 +439,10 @@ h2 {
 }
 
 .prompt-chip {
-  border: 1px solid rgba(21, 36, 44, 0.1);
+  border: 1px solid rgba(28, 18, 8, 0.1);
   border-radius: 999px;
   padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 249, 241, 0.72);
   color: var(--muted-strong);
   transition:
     transform 160ms ease,
@@ -402,8 +454,8 @@ h2 {
 .prompt-chip:focus-visible {
   transform: translateY(-1px);
   outline: none;
-  border-color: rgba(35, 111, 127, 0.24);
-  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(193, 39, 45, 0.22);
+  background: rgba(255, 249, 241, 0.95);
 }
 
 .chat-messages {
@@ -414,7 +466,7 @@ h2 {
   flex-direction: column;
   gap: 12px;
   padding: 8px 2px 18px;
-  scrollbar-color: rgba(21, 36, 44, 0.2) transparent;
+  scrollbar-color: rgba(28, 18, 8, 0.2) transparent;
 }
 
 .message {
@@ -422,20 +474,20 @@ h2 {
   padding: 14px 16px;
   border-radius: 18px;
   line-height: 1.5;
-  box-shadow: 0 10px 24px rgba(18, 32, 41, 0.06);
+  box-shadow: 0 10px 24px rgba(28, 18, 8, 0.06);
   border: 1px solid transparent;
 }
 
 .message.user {
   align-self: end;
-  background: linear-gradient(180deg, #e6f1f3, #dfecef);
-  border-color: rgba(35, 111, 127, 0.12);
+  background: linear-gradient(180deg, #f4e8e8, #ecdcdc);
+  border-color: rgba(193, 39, 45, 0.12);
 }
 
 .message.assistant {
   align-self: start;
-  background: linear-gradient(180deg, #ffffff, #f5f8fa);
-  border-color: rgba(21, 36, 44, 0.08);
+  background: linear-gradient(180deg, #fffbf5, #f7f2ea);
+  border-color: rgba(28, 18, 8, 0.08);
 }
 
 .composer-shell {
@@ -443,9 +495,9 @@ h2 {
   padding-top: 14px;
   background: linear-gradient(
     180deg,
-    rgba(238, 244, 247, 0) 0%,
-    rgba(238, 244, 247, 0.86) 24%,
-    rgba(238, 244, 247, 0.98) 100%
+    rgba(243, 236, 224, 0) 0%,
+    rgba(243, 236, 224, 0.86) 24%,
+    rgba(243, 236, 224, 0.98) 100%
   );
 }
 
@@ -458,22 +510,22 @@ h2 {
 
 .chat-form input {
   width: 100%;
-  border: 1px solid rgba(21, 36, 44, 0.14);
+  border: 1px solid rgba(28, 18, 8, 0.14);
   border-radius: 999px;
   padding: 14px 18px;
-  background: rgba(255, 255, 255, 0.88);
+  background: rgba(255, 249, 241, 0.88);
   color: var(--ink);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .chat-form input::placeholder {
-  color: #82919b;
+  color: #9a8670;
 }
 
 .chat-form input:focus {
   outline: none;
-  border-color: rgba(35, 111, 127, 0.38);
-  box-shadow: 0 0 0 4px rgba(35, 111, 127, 0.12);
+  border-color: rgba(193, 39, 45, 0.36);
+  box-shadow: 0 0 0 4px rgba(193, 39, 45, 0.10);
 }
 
 .mic-button {
@@ -482,24 +534,24 @@ h2 {
   justify-content: center;
   width: 46px;
   height: 46px;
-  border: 1px solid rgba(21, 36, 44, 0.14);
+  border: 1px solid rgba(28, 18, 8, 0.14);
   border-radius: 999px;
   color: var(--muted-strong);
-  background: rgba(255, 255, 255, 0.88);
+  background: rgba(255, 249, 241, 0.88);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
   transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
 }
 
 .mic-button:hover:not(:disabled) {
   transform: translateY(-1px);
-  border-color: rgba(35, 111, 127, 0.3);
+  border-color: rgba(193, 39, 45, 0.28);
   color: var(--accent);
 }
 
 .mic-button[data-state="recording"] {
-  background: rgba(200, 40, 40, 0.08);
-  border-color: rgba(200, 40, 40, 0.35);
-  color: #c03030;
+  background: rgba(193, 39, 45, 0.08);
+  border-color: rgba(193, 39, 45, 0.35);
+  color: var(--accent);
   animation: mic-pulse 1.2s ease-in-out infinite;
 }
 
@@ -509,8 +561,8 @@ h2 {
 }
 
 @keyframes mic-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(200, 40, 40, 0.3); }
-  50%       { box-shadow: 0 0 0 7px rgba(200, 40, 40, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(193, 39, 45, 0.30); }
+  50%       { box-shadow: 0 0 0 7px rgba(193, 39, 45, 0); }
 }
 
 .send-button {
@@ -521,7 +573,7 @@ h2 {
   padding: 12px 18px;
   font-weight: 700;
   letter-spacing: 0.02em;
-  box-shadow: 0 12px 28px rgba(24, 77, 89, 0.24);
+  box-shadow: 0 12px 28px rgba(139, 26, 30, 0.28);
   transition:
     transform 180ms ease,
     box-shadow 180ms ease,
@@ -531,8 +583,8 @@ h2 {
 .send-button:hover,
 .send-button:focus-visible {
   transform: translateY(-1px);
-  filter: brightness(1.02);
-  box-shadow: 0 16px 32px rgba(24, 77, 89, 0.28);
+  filter: brightness(1.05);
+  box-shadow: 0 16px 32px rgba(139, 26, 30, 0.34);
   outline: none;
 }
 
@@ -546,7 +598,7 @@ h2 {
   cursor: not-allowed;
 }
 
-/* Loading spinner bubble */
+/* ── Loading spinner ────────────────────────────────────────────────────────── */
 
 @keyframes nursearm-spin {
   to { transform: rotate(360deg); }
@@ -566,11 +618,13 @@ h2 {
   flex-shrink: 0;
   width: 16px;
   height: 16px;
-  border: 2px solid rgba(31, 43, 36, 0.15);
+  border: 2px solid rgba(28, 18, 8, 0.12);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: nursearm-spin 0.75s linear infinite;
 }
+
+/* ── Splitters ──────────────────────────────────────────────────────────────── */
 
 .splitter {
   position: relative;
@@ -585,7 +639,7 @@ h2 {
   inset: 50% auto auto 50%;
   transform: translate(-50%, -50%);
   border-radius: 999px;
-  background: rgba(21, 36, 44, 0.18);
+  background: rgba(28, 18, 8, 0.18);
   transition: background-color 150ms ease, box-shadow 150ms ease;
 }
 
@@ -609,8 +663,8 @@ h2 {
 
 .splitter:hover::before,
 .splitter:focus-visible::before {
-  background: rgba(35, 111, 127, 0.48);
-  box-shadow: 0 0 0 6px rgba(35, 111, 127, 0.08);
+  background: rgba(193, 39, 45, 0.42);
+  box-shadow: 0 0 0 6px rgba(193, 39, 45, 0.08);
 }
 
 .splitter:focus-visible {
@@ -641,7 +695,7 @@ body.is-resizing-horizontal * {
   border: 0;
 }
 
-/* ── Tablet (≤ 1180px) — single column, scrollable ──────────────────────── */
+/* ── Tablet (≤ 1180px) — single column, scrollable ──────────────────────────── */
 
 @media (max-width: 1180px) {
   html,
@@ -690,14 +744,16 @@ body.is-resizing-horizontal * {
   .chat-panel {
     min-height: 680px;
   }
+
+  .hk-skyline {
+    display: none;
+  }
 }
 
-/* ── Phone (≤ 768px) — floating-pill tab layout ──────────────────────────
-   Three tabs: Chat (default) | Camera (both feeds) | Status
-   Desktop (> 768px) is completely unaffected.                     ────────── */
+/* ── Phone (≤ 768px) — floating-pill tab layout ────────────────────────────── */
 
 .mobile-tab-bar {
-  display: none; /* hidden on desktop / tablet */
+  display: none;
 }
 
 @media (max-width: 768px) {
@@ -712,7 +768,7 @@ body.is-resizing-horizontal * {
     min-height: unset;
     padding: 0;
     gap: 0;
-    padding-bottom: 92px; /* room for floating pill tab bar */
+    padding-bottom: 92px;
   }
 
   .workspace {
@@ -743,6 +799,11 @@ body.is-resizing-horizontal * {
     grid-template-columns: unset;
   }
 
+  .hk-skyline {
+    margin-top: 24px;
+    opacity: 0.22;
+  }
+
   /* ── Layout (Chat + Camera tabs) ── */
 
   #layout {
@@ -758,18 +819,15 @@ body.is-resizing-horizontal * {
     gap: 0;
   }
 
-  /* Splitters always hidden on mobile */
   #camera-splitter,
   #layout-splitter {
     display: none !important;
   }
 
-  /* Camera 2 hidden except on Camera tab (overridden below) */
   #camera-column > .camera-panel:last-of-type {
     display: none;
   }
 
-  /* Chat panel: default visible, fills layout */
   .chat-panel {
     display: flex !important;
     height: 100%;
@@ -796,14 +854,14 @@ body.is-resizing-horizontal * {
 
   .chat-head { margin-bottom: 12px; }
 
-  /* ── Camera tab — both feeds stacked ── */
+  /* ── Camera tab ── */
 
   body.mobile-tab-camera #camera-column {
     display: flex !important;
     flex-direction: column;
     height: 100%;
     gap: 2px;
-    background: #080e12;
+    background: #0e0804;
   }
 
   body.mobile-tab-camera .chat-panel {
@@ -822,12 +880,10 @@ body.is-resizing-horizontal * {
     overflow: hidden;
   }
 
-  /* Show Camera 2 on camera tab */
   body.mobile-tab-camera #camera-column > .camera-panel:last-of-type {
     display: flex !important;
   }
 
-  /* Gradient overlay carrying the label */
   body.mobile-tab-camera .panel-top {
     display: flex !important;
     position: absolute;
@@ -836,7 +892,7 @@ body.is-resizing-horizontal * {
     right: 0;
     padding: 10px 12px 28px;
     margin: 0;
-    background: linear-gradient(to bottom, rgba(8, 14, 18, 0.55), transparent);
+    background: linear-gradient(to bottom, rgba(14, 8, 4, 0.55), transparent);
     z-index: 5;
     pointer-events: none;
     align-items: center;
@@ -856,8 +912,8 @@ body.is-resizing-horizontal * {
     font-size: 0.62rem;
     padding: 3px 8px;
     gap: 5px;
-    background: rgba(47, 127, 111, 0.5);
-    border-color: rgba(47, 127, 111, 0.25);
+    background: rgba(46, 122, 98, 0.5);
+    border-color: rgba(46, 122, 98, 0.25);
     color: rgba(255, 255, 255, 0.92);
   }
 
@@ -869,7 +925,7 @@ body.is-resizing-horizontal * {
 
   body.mobile-tab-camera .camera-stage {
     border-radius: 0 !important;
-    background: #080e12;
+    background: #0e0804;
   }
 
   /* ── Status tab ── */
@@ -888,17 +944,16 @@ body.is-resizing-horizontal * {
     transform: translateX(-50%);
     padding: 5px;
     gap: 4px;
-    background: rgba(238, 244, 247, 0.68);
+    background: rgba(243, 236, 224, 0.72);
     backdrop-filter: blur(28px) saturate(1.4);
     -webkit-backdrop-filter: blur(28px) saturate(1.4);
-    border: 1px solid rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.62);
     border-radius: 999px;
     box-shadow:
-      0 8px 32px rgba(18, 32, 41, 0.18),
-      0 2px 8px rgba(18, 32, 41, 0.1),
+      0 8px 32px rgba(28, 18, 8, 0.16),
+      0 2px 8px rgba(28, 18, 8, 0.10),
       inset 0 1px 0 rgba(255, 255, 255, 0.65);
     z-index: 200;
-    /* account for iPhone home indicator */
     margin-bottom: env(safe-area-inset-bottom, 0px);
   }
 
@@ -938,7 +993,7 @@ body.is-resizing-horizontal * {
   .mobile-tab-btn.active {
     background: var(--accent);
     color: #fff;
-    box-shadow: 0 4px 16px rgba(35, 111, 127, 0.4);
+    box-shadow: 0 4px 16px rgba(193, 39, 45, 0.38);
     padding: 11px 22px;
   }
 
