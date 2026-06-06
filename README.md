@@ -2,7 +2,7 @@
 
 > An SO-101 robot arm that helps a person with physical tasks — feeding, dispensing
 > medication, picking things up, handing things over. You ask in plain language (or
-> speak into the mic); a local LLM **agent** orchestrates fast, specialized **skills**
+> speak into the mic); an LLM **agent** orchestrates fast, specialized **skills**
 > and watches each one through an Intel RealSense RGB-D camera, recovering when
 > something goes wrong.
 
@@ -19,9 +19,12 @@ Built for a 24-hour hackathon. Healthcare for Hong Kong.
 ### Prerequisites
 
 ```bash
-# 1. Install Ollama and pull the model
+# 1. Install Ollama (only needed if using the Ollama backend)
 curl -fsSL https://ollama.com/install.sh | sh
-ollama pull qwen3:4b
+ollama pull qwen3:4b          # default model
+# or
+ollama pull qwen2.5:3b        # smaller, faster, better at following instructions
+ollama pull qwen2.5:7b        # best quality, needs ~5 GB RAM
 
 # 2. Install Python dependencies
 uv sync --extra dev
@@ -38,28 +41,106 @@ is recommended to start — it is fast and already covers short clinical command
 ### Start the server
 
 ```bash
-WHISPER_MODEL=base NURSEARM_MOCK=1 uvicorn nursearm.interface.server:app --reload
+# Ollama backend (default) — uses qwen3:4b
+WHISPER_MODEL=base NURSEARM_MOCK=1 uvicorn nursearm.interface.server:app --reload --host 0.0.0.0
+
+# Claude backend — uses claude-sonnet-4-6 via Anthropic API (requires ANTHROPIC_API_KEY in .env)
+AGENT_BACKEND=claude WHISPER_MODEL=base NURSEARM_MOCK=1 uvicorn nursearm.interface.server:app --reload --host 0.0.0.0
 ```
 
 Open **http://localhost:8000** in a browser.
 
 The server automatically:
-- Starts `ollama serve` if Ollama is not already running
+- Starts `ollama serve` if Ollama is not already running (Ollama backend only)
 - Loads the Faster-Whisper model in the background (first voice request may be slow)
 - Starts an ngrok HTTPS tunnel if `ngrok` is installed and authenticated
 
-### Environment variables
+> **Note:** `--host 0.0.0.0` is required if you want the Telegram bot (OpenClaw
+> Docker container) to be able to reach the server. Without it the server only
+> accepts connections from `localhost` and the bot will report "server offline."
+
+---
+
+## Environment variables
+
+Copy `.env.example` to `.env` to persist these without setting them each run.
+
+### Agent backend
+
+| Variable | Default | Description |
+|---|---|---|
+| `AGENT_BACKEND` | `ollama` | `ollama` or `claude` — which LLM backend to use |
+
+### Ollama backend
+
+| Variable | Default | Description |
+|---|---|---|
+| `OLLAMA_MODEL` | `qwen3:4b` | Ollama model name. See [Ollama model options](#ollama-model-options) below. |
+| `OLLAMA_URL` | `http://127.0.0.1:11434` | Ollama API base URL |
+
+### Claude backend
+
+| Variable | Default | Description |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | *(required)* | Anthropic API key. Get one at [console.anthropic.com](https://console.anthropic.com). |
+| `CLAUDE_MODEL` | `claude-sonnet-4-6` | Claude model ID. |
+
+### Other
 
 | Variable | Default | Description |
 |---|---|---|
 | `NURSEARM_MOCK` | `0` | Set to `1` to run without robot and RealSense hardware |
-| `OLLAMA_MODEL` | `qwen3:4b` | Ollama model used by the agent |
-| `OLLAMA_URL` | `http://127.0.0.1:11434` | Ollama API base URL |
 | `WHISPER_MODEL` | `small` | Faster-Whisper model: `base`, `small`, `medium`, `large-v3` |
 
-Copy `.env.example` to `.env` to persist these without setting them each run.
+---
 
-### Accessing from a phone
+## LLM agent backends
+
+### Ollama (local, no API key)
+
+Runs fully on your laptop. No internet required for inference, no API cost.
+
+```bash
+OLLAMA_MODEL=qwen3:4b WHISPER_MODEL=base NURSEARM_MOCK=1 \
+  uvicorn nursearm.interface.server:app --reload --host 0.0.0.0
+```
+
+#### Ollama model options
+
+| Model | Pull command | RAM | Quality | Notes |
+|---|---|---|---|---|
+| `qwen3:4b` | `ollama pull qwen3:4b` | ~3 GB | Good | Default. Has a thinking mode that can leak verbose reasoning. |
+| `qwen2.5:3b` | `ollama pull qwen2.5:3b` | ~2 GB | Good | **Recommended.** No thinking mode, follows system prompt reliably, small download. |
+| `qwen2.5:7b` | `ollama pull qwen2.5:7b` | ~5 GB | Best local | Best instruction-following and tool-use among 7B models. |
+
+To use a different model without changing code:
+
+```bash
+OLLAMA_MODEL=qwen2.5:3b WHISPER_MODEL=base NURSEARM_MOCK=1 \
+  uvicorn nursearm.interface.server:app --reload --host 0.0.0.0
+```
+
+### Claude via Anthropic API
+
+Uses `claude-sonnet-4-6` by default. Clean replies, reliable tool-use, no local GPU needed.
+Requires an `ANTHROPIC_API_KEY` in your `.env` file.
+
+```bash
+AGENT_BACKEND=claude WHISPER_MODEL=base NURSEARM_MOCK=1 \
+  uvicorn nursearm.interface.server:app --reload --host 0.0.0.0
+```
+
+The startup log will confirm which backend is active:
+
+```
+INFO  Agent backend: Claude (claude-sonnet-4-6)
+# or
+INFO  Agent backend: Ollama
+```
+
+---
+
+## Accessing from a phone
 
 If ngrok is installed and authenticated, the server prints the public URL at startup:
 
@@ -69,98 +150,202 @@ If ngrok is installed and authenticated, the server prints the public URL at sta
 ========================================================
 ```
 
-The same URL also appears as a clickable link in the sidebar of the UI. Open it on any
-device — the full UI including voice input works because ngrok provides HTTPS (required
-by browsers for microphone access).
+The same URL also appears as a clickable link and QR code in the sidebar of the UI.
+Open it on any device — the full UI including voice input works because ngrok provides
+HTTPS (required by browsers for microphone access).
 
 Without ngrok, phones on the same WiFi can reach the server at
-`http://<laptop-local-ip>:8000`, but the mic button will be blocked by the browser
-(HTTP only). Check your laptop IP with `hostname -I`.
+`http://<laptop-local-ip>:8000`. Check your laptop IP with `hostname -I`.
+
+---
+
+## Telegram bot (OpenClaw)
+
+NurseArm can be controlled via Telegram. The bot runs in a Docker container that is
+fully isolated — it has no access to the host filesystem, shell, or browser.
+
+### What you need
+
+1. A Telegram bot token — create one with [@BotFather](https://t.me/BotFather) on Telegram.
+2. An Anthropic API key (OpenClaw uses Claude as its reasoning engine inside the bot).
+3. Docker and Docker Compose installed on the laptop.
+
+### Setup
+
+Create a `.env` file in the repo root (if you do not have one already):
+
+```bash
+cp .env.example .env
+```
+
+Add these two lines:
+
+```
+ANTHROPIC_API_KEY=sk-ant-...
+TELEGRAM_BOT_TOKEN=123456789:AAF...
+```
+
+### Run the bot
+
+Start the NurseArm server first (with `--host 0.0.0.0`), then:
+
+```bash
+docker compose up --build openclaw
+```
+
+The container:
+1. Generates an isolated OpenClaw config (no shell, no file, no browser access).
+2. Registers the Telegram bot token via `openclaw channels add`.
+3. Connects to your bot and starts listening for messages.
+
+You will see in the logs:
+
+```
+[telegram] [default] starting provider (@YourBotName)
+[gateway] ready
+```
+
+### First-time pairing
+
+The first time you message the bot on Telegram it will reply with a pairing command,
+for example:
+
+```
+openclaw pairing approve telegram U2LJC7D3
+```
+
+Run that in a separate terminal while the container is running:
+
+```bash
+docker exec nursearm-openclaw openclaw pairing approve telegram U2LJC7D3
+```
+
+This is a one-time step. After approval, your Telegram account can talk to the bot
+freely.
+
+### How it works
+
+```
+Telegram message
+    → OpenClaw (Claude inside container)
+    → MCP bridge (Python, inside container)
+    → POST /chat on NurseArm server (host, port 8000)
+    → NurseArm agent (Ollama or Claude)
+    → reply back to Telegram
+```
+
+OpenClaw uses Claude to understand the Telegram message and decides to call the
+`robot_command` MCP tool, which forwards the request to the NurseArm server. The
+NurseArm server handles all robot logic and replies in plain text.
+
+### Isolation
+
+The container has no access to:
+- The host filesystem (no volume mounts)
+- A shell (`shell`, `exec` blocked)
+- A browser (`browser`, `computer` blocked)
+- Files (`read`, `write`, `edit`, `glob`, `grep`, `ls` blocked)
+
+The only thing it can do is call `robot_command`, which POSTs to port 8000 on the host.
+
+---
+
+## Cameras and palm detection
+
+The UI shows two camera panels:
+
+| Panel | Stream | Description |
+|---|---|---|
+| Camera 1 | `/stream/palm` | Live feed with hand skeleton overlay and open/closed detection |
+| Camera 2 | `/stream` | Raw camera feed, no processing |
+
+A floating badge on Camera 1 shows the current palm state (`✋ open`, `✊ closed`,
+or `— no hand`). The server logs palm status at INFO level every ~2 seconds.
+
+---
+
+## Accessing from a phone
+
+If ngrok is installed and authenticated, the server prints the public URL at startup:
+
+```
+========================================================
+  Phone / remote access:  https://abc123.ngrok-free.app
+========================================================
+```
+
+The URL also appears as a QR code in the sidebar of the UI.
 
 ---
 
 ## Current UI — Clinical Console
 
-The operator interface is a full-screen clinical console built with vanilla HTML/CSS/JS.
-
 ```
 ┌─────────────┬───────────────────────────────────────────────────┐
-│  NurseArm   │  Camera 1 — Overhead view              [Live]     │
-│  Clinical   │                                                   │
-│  console    │  [MJPEG stream — laptop webcam or RealSense]      │
+│  NurseArm   │  Camera 1 — Palm detection             [Live]     │
+│  Clinical   │                                    [✋ open badge] │
+│  console    │  [MJPEG stream with hand skeleton overlay]        │
 │             │                                                   │
 │  System     ├───────────────────────────────────────────────────┤
-│  Cameras    │  Camera 2 — Side view                  [Live]     │
+│  Cameras    │  Camera 2 — Raw feed                   [Live]     │
 │  Audit      │                                                   │
-│             │  [MJPEG stream]                                   │
+│             │  [MJPEG stream — laptop webcam or RealSense]      │
 │  Remote URL ├───────────────────────────────────────────────────┤
 │  (ngrok)    │  Chat — Operator instructions       [Audit on]    │
-│             │                                                   │
-│  Focus tip  │  [Morning pills] [Scene check] [Feeding help]     │
-│             │  ─────────────────────────────────────────────── │
+│  [QR code]  │                                                   │
+│             │  [Morning pills] [Scene check] [Feeding help]     │
+│  Focus tip  │  ─────────────────────────────────────────────── │
 │             │  [input field]              [🎤 mic]  [Send]      │
 └─────────────┴───────────────────────────────────────────────────┘
 ```
 
 **Key features:**
 
-- **Live camera** — MJPEG stream pushed at 25 fps; no JS polling loop. Both camera
-  panels connect to the same stream, updated at 30 fps by a background capture task.
-  In mock mode the laptop webcam is used automatically; a synthetic frame is shown
-  if no webcam is found.
+- **Live cameras** — Camera 1 shows the palm detection overlay; Camera 2 is the raw
+  feed. Both stream at 25–30 fps via MJPEG with no JS polling.
+
+- **Palm detection badge** — floating pill on Camera 1 that updates every second:
+  `✋ open`, `✊ closed`, or `— no hand`. Driven by MediaPipe Hand Landmarker.
 
 - **Voice input** — click the mic button to record, click again to stop. Audio is sent
   to the server, transcribed locally by Faster-Whisper, and the text fills the input
-  field. The input and send button are disabled during transcription with a
-  "Transcribing…" placeholder. Language is fixed to English.
+  field.
 
-- **Prompt chips** — three quick-action buttons pre-fill the input with common commands
-  (`Morning pills`, `Scene check`, `Feeding help`). Click a chip then Send.
+- **Prompt chips** — quick-action buttons pre-fill the input with common commands.
 
-- **Chat** — user messages appear immediately. A spinner ("Thinking…") shows while the
-  agent is working. Input and send are disabled during a response. Every agent decision
-  is streamed to the audit log via WebSocket.
+- **Chat** — user messages appear immediately. A spinner shows while the agent works.
+  Every agent decision streams to the audit log via WebSocket.
 
-- **Resizable panels** — drag the horizontal splitter to resize the two camera panels;
-  drag the vertical splitter to resize cameras vs chat. Layout is persisted to
+- **Resizable panels** — drag splitters to resize cameras vs chat. Layout persists to
   `localStorage`.
 
-- **Sidebar rail** — system status cards (System, Cameras, Audit) and, when ngrok is
-  active, a clickable remote-access URL.
+- **QR code** — the ngrok URL appears as a scannable QR code in the sidebar.
 
 ---
 
 ## Models
 
-### LLM agent — Qwen3:4b (Ollama)
+### LLM agent
 
-The agent runs locally via Ollama. It receives the user's message, the list of
-available MCP tools, and the conversation history. It decides which tool to call,
-calls it, reads the result, and produces a plain-language reply.
+Two backends are available. Switch with `AGENT_BACKEND`.
 
-**Why Qwen3:4b:** fast tool-calling, runs well on a laptop GPU, no API key needed.
-Swap to any Ollama-hosted model by setting `OLLAMA_MODEL`. The agent uses `think: false`
-to suppress chain-of-thought tokens and includes a recovery path that handles the case
-where the model emits a tool call as plain-text JSON instead of the proper
-function-call wire format.
+**Ollama (default):** runs locally, no API key. The agent uses `think: false` to
+suppress chain-of-thought tokens and includes a recovery path for models that emit
+tool calls as plain-text JSON. See [Ollama model options](#ollama-model-options).
 
-Ollama is started automatically by the server if it is not already running.
+**Claude:** calls the Anthropic API. Reliable tool-use, clean replies, no local GPU
+required. Uses `claude-sonnet-4-6` by default; override with `CLAUDE_MODEL`.
 
 ### Speech-to-text — Faster-Whisper
 
-[Faster-Whisper](https://github.com/SYSTRAN/faster-whisper) is a CTranslate2
-reimplementation of OpenAI Whisper. It runs fully locally — no API key, no network
-request for transcription.
+[Faster-Whisper](https://github.com/SYSTRAN/faster-whisper) runs fully locally.
 
 | Model | Size | Speed on GPU | Recommended for |
 |---|---|---|---|
-| `base` | ~150 MB | ~0.5 s | Quick demo, already downloaded |
-| `small` | ~460 MB | ~1 s | Better accuracy, good default |
+| `base` | ~150 MB | ~0.5 s | Quick demo |
+| `small` | ~460 MB | ~1 s | Good default |
 | `medium` | ~1.5 GB | ~2 s | High accuracy |
 | `large-v3` | ~3 GB | ~3–4 s | Best quality |
-
-The model is loaded on first voice request. On an RTX 5070 (Blackwell) the server
-forces `compute_type=float16` — INT8 crashes on that architecture.
 
 Set `WHISPER_MODEL=base` (or any size above) before starting the server. The model
 downloads from Hugging Face to `~/.cache/huggingface/hub/` automatically.
@@ -179,15 +364,6 @@ managed by the FastAPI server. The MCP server exposes these tools:
 | `list_skills` | Lists every enabled skill with kind and description. |
 | `get_scene` | Reads the current camera-derived scene observation without moving the robot. |
 
-The single `run_vla` tool covers all physical assistance tasks — dispensing medication,
-feeding, picking up objects, handing things over. The VLA model receives the task
-description in natural language and decides the arm motions internally. When a real
-policy checkpoint is ready, set `policy_path` in `config/skills.yaml` and replace
-`DummyVLASkill` with the real implementation — the MCP interface does not change.
-
-Primitive skills (`move_up`, `move_down`) and dummy integration skills are accessible
-via `run_skill`. The dummy skills always return success and never move hardware.
-
 ---
 
 ## Architecture
@@ -196,7 +372,7 @@ via `run_skill`. The dummy skills always return success and never move hardware.
   voice / text  ─▶  INTERFACE (FastAPI + clinical web UI)
                          │  user intent
                          ▼
-                    AGENT  (Ollama + Qwen3:4b, tool-calling via MCP)
+                    AGENT  (Ollama local  ─or─  Claude API)
                          │  picks a tool, reads result, reports
               ┌──────────┴──────────┐
               ▼                     ▼
@@ -208,12 +384,10 @@ via `run_skill`. The dummy skills always return success and never move hardware.
        SKILL REGISTRY  ──▶  RobotController  ──▶  SO-101 (LeRobot)
                        ──▶  Perception       ──▶  RealSense / webcam
 
-  Side services: Faster-Whisper (STT) · ngrok (remote HTTPS) · Audit log (JSONL)
+  Side services:
+    Faster-Whisper (STT) · ngrok (remote HTTPS) · Audit log (JSONL)
+    OpenClaw Docker bot  (Telegram → /chat bridge, isolated container)
 ```
-
-**The one design rule that keeps this buildable in 24h:** robot policies stay dumb and
-reliable (one trained skill each); all intelligence lives in the orchestrator. Never
-push reasoning into the policy. See **AGENT.md**.
 
 ---
 
@@ -235,7 +409,7 @@ python scripts/train_skill.py  dispense_pills --steps 60000
 #    set the printed policy_path in config/skills.yaml
 
 # 3) run for real
-NURSEARM_MOCK=0 uvicorn nursearm.interface.server:app
+NURSEARM_MOCK=0 uvicorn nursearm.interface.server:app --host 0.0.0.0
 ```
 
 For quick laptop-only testing, you can use the built-in webcam instead of the Intel
@@ -286,7 +460,7 @@ There are two directories named `nursearm`:
 | Module | Responsibility |
 |---|---|
 | `interface/` | FastAPI server, MJPEG stream, voice transcription endpoint, web UI |
-| `orchestrator/` | Local Ollama agent, skill registry, MCP client |
+| `orchestrator/` | Ollama agent, Claude agent, skill registry, MCP client |
 | `mcp/` | MCP server (tools) and client (discovery + invocation) |
 | `skills/` | Skill implementations: dummy VLA, primitive stubs |
 | `robot/` | LeRobot adapter — the only layer that touches the arm |
@@ -295,20 +469,33 @@ There are two directories named `nursearm`:
 | `types.py` | Shared data contracts: `SkillResult`, `SceneObservation`, etc. |
 | `config.py` | Loads `.env`, `robot.yaml`, `skills.yaml` |
 
+### `bot/` directory
+
+| File | Purpose |
+|---|---|
+| `Dockerfile` | Node 24 + Python 3 image; installs OpenClaw and the MCP bridge |
+| `entrypoint.sh` | Generates OpenClaw config, registers Telegram channel, starts gateway |
+| `mcp_bridge.py` | FastMCP server with one `robot_command` tool; POSTs to `/chat` |
+| `workspace/SOUL.md` | OpenClaw agent persona — brief, safety-first, one tool only |
+| `requirements.txt` | Python deps for the MCP bridge (`mcp`, `httpx`) |
+
 ### What is working now
 
 | Feature | Status |
 |---|---|
 | Clinical web UI (rail sidebar, cameras, chat, chips) | Working |
 | Live MJPEG camera stream (webcam in mock mode) | Working |
+| Palm detection overlay on Camera 1 with badge | Working |
 | Voice input via Faster-Whisper (local, English) | Working |
-| Local Qwen3:4b agent via Ollama | Working |
+| Ollama agent (qwen3:4b, qwen2.5:3b, qwen2.5:7b) | Working |
+| Claude agent (claude-sonnet-4-6 via Anthropic API) | Working |
 | MCP tool calling (`run_vla`, `list_skills`, `get_scene`) | Working |
 | Dummy VLA skill (echoes task, simulates success) | Working |
 | Primitive mock moves (`move_up`, `move_down`) | Working |
 | Audit log + WebSocket stream to UI | Working |
-| ngrok HTTPS tunnel with sidebar URL | Working |
+| ngrok HTTPS tunnel with sidebar URL + QR code | Working |
 | Resizable panel layout (persisted to localStorage) | Working |
+| Telegram bot via OpenClaw Docker container | Working |
 | Real VLA policy execution | Needs trained checkpoint |
 | RealSense RGB-D pipeline | Needs hardware |
 | Cartesian robot jogging + gripper | Needs hardware |
@@ -322,13 +509,15 @@ There are two directories named `nursearm`:
 - **Confidence gating.** Every skill returns a confidence score; below threshold the agent must recover or ask.
 - **Safe-stop near humans.** `feed_person` halts if the tracked mouth point jumps unexpectedly.
 - **Audit trail.** Every agent decision and robot action is timestamped and logged — required for healthcare, built in from day one.
+- **Bot isolation.** The Telegram bot runs in a Docker container with no shell, no filesystem, and no browser access — it can only call `robot_command`.
 - **Open and swappable.** MCP-standard tools; swap the local model or arm by rewriting one file. Total hardware cost < US$1,000.
 
 ---
 
 ## Tech stack
 
-Ollama + Qwen3:4b (local agent) · Faster-Whisper (local STT) ·
-FastAPI + MJPEG streaming (interface) · MCP (tool protocol) ·
-LeRobot + ACT/SmolVLA (robot + policies) · Intel RealSense + MediaPipe (perception) ·
-ngrok (remote HTTPS access) · `uv` (packaging)
+Ollama + Qwen2.5 / Qwen3 (local agent) · Claude Sonnet 4.6 (cloud agent) ·
+Faster-Whisper (local STT) · FastAPI + MJPEG streaming (interface) ·
+MCP (tool protocol) · LeRobot + ACT/SmolVLA (robot + policies) ·
+Intel RealSense + MediaPipe (perception) · ngrok (remote HTTPS) ·
+OpenClaw (Telegram/WhatsApp gateway) · Docker (bot isolation) · `uv` (packaging)
