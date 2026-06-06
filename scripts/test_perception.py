@@ -6,7 +6,7 @@ mouth point, palm point + open/closed, detected objects, and the gaze target.
 If this doesn't show correct 3D points, no skill will work.
 
     python scripts/test_perception.py            # real RealSense
-    CAREARM_MOCK=1 python scripts/test_perception.py   # no hardware (sanity only)
+    NURSEARM_MOCK=1 python scripts/test_perception.py   # no hardware (sanity only)
 """
 
 from __future__ import annotations
@@ -15,11 +15,11 @@ import os
 
 import cv2
 
-from carearm.perception.realsense import Perception
+from nursearm.perception.realsense import Perception
 
 
 def main() -> None:
-    mock = os.getenv("CAREARM_MOCK", "0") == "1"
+    mock = os.getenv("NURSEARM_MOCK", "0") == "1"
     perception = Perception(mock=mock)
     print("Streaming. Press 'q' to quit." + (" [MOCK]" if mock else ""))
     try:
@@ -35,7 +35,7 @@ def main() -> None:
             ):
                 cv2.putText(frame, line, (8, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
                 y += 22
-            cv2.imshow("CareArm perception", frame)
+            cv2.imshow("NurseArm perception", frame)
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
     finally:

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import argparse
 
-from carearm import config
+from nursearm import config
 
 
 def main() -> None:
@@ -30,7 +30,7 @@ def main() -> None:
   --robot.type=so101_follower --robot.port={rc.get('follower_port', '/dev/ttyACM0')} --robot.id={rc.get('follower_id', 'follower')} \\
   --teleop.type=so101_leader  --teleop.port={rc.get('leader_port', '/dev/ttyACM1')}  --teleop.id={rc.get('leader_id', 'leader')} \\
   --robot.cameras="{rc.get('camera_arg')}" \\
-  --dataset.repo_id={args.hf_user}/carearm_{args.skill} \\
+  --dataset.repo_id={args.hf_user}/nursearm_{args.skill} \\
   --dataset.single_task="{task}" \\
   --dataset.num_episodes={args.episodes} \\
   --dataset.episode_time_s=30 \\

@@ -1,9 +1,24 @@
-# Skill registry. name -> class + description (the judge reads the description to choose)
-# + policy_path (the trained checkpoint). Set policy_path after scripts/train_skill.py.
+# Skill registry. Primitive skills emit direct commands; VLA skills run a
+# language-conditioned policy using prompt/task and policy_path.
 
 skills:
+  move_up:
+    type: primitive
+    class: nursearm.skills.primitives.MoveUp
+    description: >
+      Move the robot end effector up by a small fixed step. Args: {step_m: <metres>}.
+    enabled: true
+
+  move_down:
+    type: primitive
+    class: nursearm.skills.primitives.MoveDown
+    description: >
+      Move the robot end effector down by a small fixed step. Args: {step_m: <metres>}.
+    enabled: true
+
   dispense_pills:
-    class: carearm.skills.dispense_pills.DispensePills
+    type: vla
+    class: nursearm.skills.dispense_pills.DispensePills
     description: >
       Find today's prescribed pill among the pills on the table, pick it up, and place
       it in the cup. Use when the person asks for their medication. Args: {pill: <name>}.
@@ -12,7 +27,8 @@ skills:
     enabled: true
 
   feed_person:
-    class: carearm.skills.feed_person.FeedPerson
+    type: vla
+    class: nursearm.skills.feed_person.FeedPerson
     description: >
       Scoop food from the bowl and bring the spoon to the person's mouth, stopping safely
       short. Use when the person asks to be fed. Args: {food: <name>}.
@@ -21,7 +37,8 @@ skills:
     enabled: true
 
   gaze_pick:
-    class: carearm.skills.gaze_pick.GazePick
+    type: vla
+    class: nursearm.skills.gaze_pick.GazePick
     description: >
       Pick up the object the person is looking at. Use when they say "give me that" while
       looking at an item. (Stretch skill.)
@@ -30,7 +47,8 @@ skills:
     enabled: false   # enable once trained — keeps the judge's choices to working skills
 
   hand_handoff:
-    class: carearm.skills.hand_handoff.HandHandoff
+    type: vla
+    class: nursearm.skills.hand_handoff.HandHandoff
     description: >
       Place the held object safely into the person's open palm. Use to hand something over.
     task: "place the object into the person's open hand"

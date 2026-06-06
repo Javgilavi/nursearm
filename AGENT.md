@@ -1,11 +1,11 @@
 # AGENT.md — the orchestrator (the Judge)
 
-This is the heart of CareArm. It specifies how the LLM drives the robot. The pattern
+This is the heart of NurseArm. It specifies how the LLM drives the robot. The pattern
 (Physical AI Hack 2026 runner-up): **a slow, high-level LLM planner — the "judge" —
 orchestrating a collection of fast, specialized, language-conditioned sub-policies —
 "skills" — with recovery behaviours between them.**
 
-Implemented in [`carearm/orchestrator/`](./carearm/orchestrator/): `judge.py` (the
+Implemented in [`nursearm/orchestrator/`](./nursearm/orchestrator/): `judge.py` (the
 loop + tool schemas), `skill_registry.py`, `recovery.py`, `prompts.py`.
 
 ---
@@ -158,7 +158,7 @@ arm is always `reset()` to a safe home before a retry.
   lower latency/cost during iteration. Use the Anthropic API directly for tight control
   of the loop (what we do), or the Claude Agent SDK for a ready-made agent harness.
 - **Connect from anywhere (optional):** wrap the same tools behind an MCP gateway
-  ([`carearm/mcp/robot_server.py`](./carearm/mcp/robot_server.py)) to get WhatsApp /
+  ([`nursearm/mcp/robot_server.py`](./nursearm/mcp/robot_server.py)) to get WhatsApp /
   Telegram / Slack for free — a strong live moment (a judge messages the robot from
   their phone). Bind to loopback, require auth, pair only known users. The model on the
   far side still can't send raw joint commands — only the bounded tools.
@@ -170,7 +170,7 @@ arm is always `reset()` to a safe home before a retry.
 ## 8. What to build first
 
 1. `skills/base.py` + one real skill (`dispense_pills`) with the registry wired.
-2. The judge loop in **mock mode** (`CAREARM_MOCK=1`) choosing that skill from text —
+2. The judge loop in **mock mode** (`NURSEARM_MOCK=1`) choosing that skill from text —
    no robot, no camera. Confirm the audit log streams to the UI.
 3. Perception for the skill (pills → 3D points) verified live with `test_perception.py`.
 4. Train the ACT policy, set `policy_path`, run the skill for real through the judge.

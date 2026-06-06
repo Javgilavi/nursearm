@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import argparse
 
-from carearm import config
+from nursearm import config
 
 
 def main() -> None:
@@ -25,7 +25,7 @@ def main() -> None:
 
     out = f"outputs/train/{args.policy}_{args.skill}"
     cmd = f"""lerobot-train \\
-  --dataset.repo_id={args.hf_user}/carearm_{args.skill} \\
+  --dataset.repo_id={args.hf_user}/nursearm_{args.skill} \\
   --policy.type={args.policy} \\
   --policy.device=cuda \\
   --batch_size={args.batch_size} \\

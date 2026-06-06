@@ -1,5 +1,5 @@
 [project]
-name = "carearm"
+name = "nursearm"
 version = "0.1.0"
 description = "Assistive SO-101 robot arm driven by an LLM orchestrator (judge + skills + RGB-D perception)."
 readme = "README.md"
@@ -18,7 +18,7 @@ dependencies = [
 
 # NOTE on LeRobot: it is NOT a hard dependency here on purpose. LeRobot pins torch to a
 # CUDA wheel index, which makes it painful as a transitive dep. Install it into the SAME
-# venv as CareArm (see README "Installing LeRobot"). The [robot] extra below adds the
+# venv as NurseArm (see README "Installing LeRobot"). The [robot] extra below adds the
 # camera/vision deps that DO resolve cleanly.
 [project.optional-dependencies]
 robot = [
@@ -42,14 +42,14 @@ dev = [
 ]
 
 [project.scripts]
-carearm-serve = "carearm.interface.server:app"
+nursearm-serve = "nursearm.interface.server:app"
 
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["carearm*"]
+include = ["nursearm*"]
 
 [tool.ruff]
 line-length = 110

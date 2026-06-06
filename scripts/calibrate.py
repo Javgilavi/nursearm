@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from carearm import config
+from nursearm import config
 
 
 def main() -> None:

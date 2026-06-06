@@ -9,7 +9,7 @@ working demo.
 
 ## North star (what "done" looks like)
 
-A hackathon judge types or says *"give me my morning pills"* into the web UI. CareArm:
+A hackathon judge types or says *"give me my morning pills"* into the web UI. NurseArm:
 1. calls `get_today_medication` → today's pill from the (mock or real) calendar,
 2. calls `get_scene` → sees the pills on the table, classifies them,
 3. calls `run_skill("dispense_pills", {pill: ...})` → the SO-101 picks the right pill
@@ -21,20 +21,32 @@ If feeding is also working, *"I'm hungry"* triggers `feed_person` with a safe st
 
 ---
 
-## Scope ladder (build in this order, stop when time runs out)
+## Three build levels
 
-1. **Mock end-to-end** — judge loop + skill registry + audit + web UI in `CAREARM_MOCK=1`.
-   The brain works on a laptop before hardware exists. *(highest leverage — do first)*
-2. **Perception MVP** — `test_perception.py` shows correct 3D mouth / hand / object points.
-3. **`dispense_pills`** — record → train ACT → wire policy_path → real pick & place.
-4. **`feed_person`** — scoop policy + servo-to-mouth with safe-stop.
-5. **Calendar (real)** — swap mock for Google Calendar.
-6. **Judge chooses** between the two skills from a free-text request.
-7. **`gaze_pick`** (wow) → **`hand_handoff`** (safety) → tighten the safety gates.
-8. **Stretch:** MCP gateway so a phone (WhatsApp/Telegram) can message the robot.
+1. **VLA** - get a language-conditioned policy executing a robot skill from a prompt.
+2. **Text/voice agent** - let the agent choose primitive or VLA skills from user input.
+3. **CV inputs** - add RealSense hand and mouth tracking for visual targets.
+
+Within Level 1, build `dispense_pills` first and `feed_person` second. The existing
+mock server remains useful for developing the UI and agent while VLA work proceeds.
 
 Hard rule: **collect data and verify RealSense alignment in the first 3 hours** — every
 skill depends on both. If perception 3D points are wrong, nothing downstream works.
+
+---
+
+## Current team split
+
+| Workstream | Current focus | Integration deliverable |
+|---|---|---|
+| Diffusion + camera | Test the diffusion model with camera observations and establish its input/output format | A callable inference path with one recorded camera example and measured latency |
+| VLA + robot | Test language-conditioned VLA execution on the SO-101 | One prompt reliably produces one recorded robot behavior |
+| UI | Build the text/voice interface and display system status/results | UI can submit a request to the backend and render its response |
+| Agentic connection | Connect user requests to primitive and VLA skills through the judge | Agent lists skills, chooses one, invokes it, and returns the result |
+
+Integration order: first agree on the backend request/result contract, then connect
+the UI to the agent, the agent to the VLA, and finally add camera-derived targets.
+Each workstream should keep a mock path so integration is not blocked by hardware.
 
 ---
 
@@ -43,7 +55,7 @@ skill depends on both. If perception 3D points are wrong, nothing downstream wor
 | Hours | Goal | Owner |
 |---|---|---|
 | 0–2  | Repo + venv (install into lerobot venv), SO-101 calibration, RealSense streaming + `rs.align` verified | E1 |
-| 0–2  | **Mock end-to-end**: `CAREARM_MOCK=1` server runs, judge selects a skill, audit log streams to UI | E3 + E4 |
+| 0–2  | **Mock end-to-end**: `NURSEARM_MOCK=1` server runs, judge selects a skill, audit log streams to UI | E3 + E4 |
 | 0–3  | Perception MVP: mouth + hand + object 3D points visualized in `test_perception.py` | E2 |
 | 2–6  | Record demos + train ACT for `dispense_pills` (pick&place) and `feed_person` (scoop) | E1 + E2 |
 | 3–8  | Judge loop hardening: recovery behaviours, confidence gate, prompts | E3 |
