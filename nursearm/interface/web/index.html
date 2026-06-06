@@ -1,85 +1,65 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>NurseArm</title>
-<style>
-  :root { color-scheme: dark; }
-  * { box-sizing: border-box; }
-  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: #0e1116; color: #e6edf3;
-         display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr auto; height: 100vh; }
-  header { grid-column: 1 / 3; padding: 12px 18px; background: #161b22; border-bottom: 1px solid #30363d;
-           font-weight: 600; letter-spacing: .3px; }
-  header small { color: #8b949e; font-weight: 400; margin-left: 8px; }
-  #chat, #audit { overflow-y: auto; padding: 16px; }
-  #audit { background: #0a0d12; border-left: 1px solid #30363d; font: 12px/1.5 ui-monospace, monospace; }
-  .msg { margin: 0 0 12px; max-width: 85%; padding: 8px 12px; border-radius: 10px; white-space: pre-wrap; }
-  .user { background: #1f6feb; margin-left: auto; }
-  .bot { background: #21262d; }
-  .ev { margin: 0 0 6px; padding: 4px 8px; border-radius: 6px; background: #11161d; }
-  .ev .k { color: #58a6ff; }
-  .ev.tool { border-left: 3px solid #d29922; }
-  .ev.report { border-left: 3px solid #3fb950; }
-  .ev.abort, .ev.error { border-left: 3px solid #f85149; }
-  footer { grid-column: 1 / 3; display: flex; gap: 8px; padding: 12px; background: #161b22;
-           border-top: 1px solid #30363d; }
-  input { flex: 1; padding: 10px 12px; border-radius: 8px; border: 1px solid #30363d; background: #0d1117; color: inherit; }
-  button { padding: 10px 16px; border-radius: 8px; border: 0; background: #238636; color: #fff; cursor: pointer; }
-  button.mic { background: #30363d; }
-  h3 { margin: 0 0 10px; color: #8b949e; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
-</style>
-</head>
-<body>
-  <header>NurseArm <small>assistive SO-101 — LLM orchestrated</small></header>
-  <div id="chat"><h3>Conversation</h3></div>
-  <div id="audit"><h3>Audit log (live)</h3></div>
-  <footer>
-    <input id="text" placeholder="Ask NurseArm… e.g. 'Give me my morning pills'" autocomplete="off" />
-    <button class="mic" id="mic" title="Speak (browser Web Speech API)">🎤</button>
-    <button id="send">Send</button>
-  </footer>
-<script>
-const chat = document.getElementById('chat');
-const audit = document.getElementById('audit');
-const input = document.getElementById('text');
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NurseArm Console</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="header">
+        <div>
+          <p class="eyebrow">NurseArm</p>
+          <h1>Operator Console</h1>
+          <p class="subtitle">Camera 1 top left, Camera 2 bottom left, chat on the right.</p>
+        </div>
+      </header>
 
-function add(text, cls) {
-  const d = document.createElement('div');
-  d.className = 'msg ' + cls; d.textContent = text;
-  chat.appendChild(d); chat.scrollTop = chat.scrollHeight;
-}
-function addEvent(ev) {
-  const d = document.createElement('div');
-  d.className = 'ev ' + (ev.event || '');
-  const label = ev.tool ? `${ev.event}:${ev.tool}` : ev.event;
-  d.innerHTML = `<span class="k">${label}</span> ` +
-    (ev.text || JSON.stringify(ev.result || ev.args || {}));
-  audit.appendChild(d); audit.scrollTop = audit.scrollHeight;
-}
+      <main class="layout" id="layout">
+        <section class="camera-column" id="camera-column">
+          <section class="panel camera-panel">
+            <p class="panel-kicker">Camera 1</p>
+            <div class="camera-stage">
+              <img id="camera-frame-1" class="camera-frame" alt="Camera 1 view" src="/frame" />
+            </div>
+          </section>
 
-async function send() {
-  const text = input.value.trim(); if (!text) return;
-  add(text, 'user'); input.value = '';
-  const r = await fetch('/chat', { method: 'POST', headers: {'Content-Type': 'application/json'},
-                                   body: JSON.stringify({ text }) });
-  const data = await r.json(); add(data.reply, 'bot');
-}
-document.getElementById('send').onclick = send;
-input.addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
+          <div class="splitter splitter-horizontal" id="camera-splitter" role="separator" aria-label="Resize camera panes" aria-orientation="horizontal" tabindex="0"></div>
 
-// Live audit stream
-const ws = new WebSocket(`ws://${location.host}/audit`);
-ws.onmessage = e => addEvent(JSON.parse(e.data));
+          <section class="panel camera-panel">
+            <p class="panel-kicker">Camera 2</p>
+            <div class="camera-stage">
+              <img id="camera-frame-2" class="camera-frame" alt="Camera 2 view" src="/frame" />
+            </div>
+          </section>
+        </section>
 
-// Zero-key voice via the browser Web Speech API
-const mic = document.getElementById('mic');
-const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-if (SR) {
-  const rec = new SR(); rec.lang = 'en-US';
-  rec.onresult = e => { input.value = e.results[0][0].transcript; send(); };
-  mic.onclick = () => rec.start();
-} else { mic.disabled = true; mic.title = 'Web Speech API not supported in this browser'; }
-</script>
-</body>
+        <div class="splitter splitter-vertical" id="layout-splitter" role="separator" aria-label="Resize chat panel" aria-orientation="vertical" tabindex="0"></div>
+
+        <section class="panel chat-panel">
+          <div class="chat-head">
+            <div>
+              <p class="panel-kicker">Chat</p>
+              <h2>Operator instructions</h2>
+            </div>
+          </div>
+
+          <div class="chat-tip">Try: "Give me my morning pills".</div>
+
+          <div id="chat-messages" class="chat-messages"></div>
+
+          <div class="composer-shell">
+            <form id="chat-form" class="chat-form">
+              <label class="sr-only" for="chat-input">Message</label>
+              <input id="chat-input" name="message" type="text" autocomplete="off" placeholder="Type your instruction here" />
+              <button type="submit" class="send-button">Send</button>
+            </form>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+  </body>
 </html>

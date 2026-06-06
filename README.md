@@ -101,7 +101,7 @@ then install LeRobot separately with `pip install 'lerobot[feetech]'`.
 
 ```bash
 cp .env.example .env          # set ANTHROPIC_API_KEY; leave NURSEARM_MOCK=1
-NURSEARM_MOCK=1 uvicorn nursearm.interface.server:app --reload
+NURSEARM_MOCK=1 nursearm-serve
 # open http://localhost:8000  →  type "give me my morning pills"
 ```
 
@@ -129,7 +129,7 @@ python scripts/train_skill.py  dispense_pills --steps 60000
 #    → set the printed policy_path in config/skills.yaml
 
 # 3) run for real
-NURSEARM_MOCK=0 uvicorn nursearm.interface.server:app
+NURSEARM_MOCK=0 nursearm-serve
 ```
 
 ---
@@ -147,7 +147,7 @@ There are two directories named `nursearm`:
 A normal text request follows this path:
 
 1. `interface/web/index.html` sends text to `POST /chat`.
-2. `interface/server.py` owns the long-lived robot, camera, registry, audit log, and judge objects.
+2. `interface/server.py` owns the long-lived robot, camera, registry, audit log, and judge objects, and serves `GET /state`, `GET /scene`, `GET /frame`, and `WS /audit`.
 3. `orchestrator/judge.py` sends the request to Claude with a bounded tool list.
 4. The judge can inspect `perception`, query `integrations/calendar.py`, or invoke a named skill through `skill_registry.py`.
 5. A primitive skill calls a direct method such as `robot.jog()`. A VLA skill calls `robot.run_policy()` with its configured prompt and checkpoint.
