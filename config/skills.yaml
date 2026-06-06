@@ -40,6 +40,20 @@ skills:
       Move the robot end effector down by a small fixed step. Args: {step_m: <metres>}.
     enabled: true
 
+  vla:
+    type: vla
+    class: nursearm.skills.dummy.DummyVLASkill
+    description: >
+      The NurseArm VLA (Vision-Language-Action) policy. Accepts any physical assistance
+      task described in natural language and figures out the arm motions internally.
+      Use for medication dispensing, feeding, picking up objects, or any manipulation task.
+      Args: {task: <natural language description>}.
+    task: "execute the requested physical assistance task"
+    policy_path: null   # replace with trained policy path when ready
+    enabled: true
+
+  # Individual VLA skill stubs — disabled while the single VLA policy is in use.
+  # Re-enable and set policy_path when task-specific policies are trained.
   dispense_pills:
     type: vla
     class: nursearm.skills.dispense_pills.DispensePills
@@ -47,8 +61,8 @@ skills:
       Find today's prescribed pill among the pills on the table, pick it up, and place
       it in the cup. Use when the person asks for their medication. Args: {pill: <name>}.
     task: "pick the correct pill and place it in the cup"
-    policy_path: null   # e.g. outputs/train/act_dispense_pills/checkpoints/060000/pretrained_model
-    enabled: true
+    policy_path: null
+    enabled: false
 
   feed_person:
     type: vla
@@ -58,7 +72,7 @@ skills:
       short. Use when the person asks to be fed. Args: {food: <name>}.
     task: "scoop food and bring it to the person's mouth"
     policy_path: null
-    enabled: true
+    enabled: false
 
   gaze_pick:
     type: vla

@@ -70,33 +70,20 @@ def run_skill(name: str, args: dict[str, Any] | None = None) -> dict[str, Any]:
 
 
 @mcp.tool()
-def skill1_check_environment(request: str = "") -> dict[str, Any]:
-    """Run dummy skill 1 for observation or environment-check requests.
+def run_vla(task: str) -> dict[str, Any]:
+    """Run the NurseArm VLA (Vision-Language-Action) policy for any physical task.
 
-    Choose this when the user asks the system to inspect, check, assess, or look at
-    the surroundings. It performs no camera inference and no robot movement.
+    Use this for ALL manipulation requests: dispensing medication, feeding, picking up
+    objects, handing things over. Describe the task in natural language — the VLA
+    figures out the arm motions from the live camera and the task description.
+
+    Examples:
+      task="give the person their morning pills"
+      task="feed the person some food from the bowl"
+      task="pick up the red cup and hand it to the person"
     """
-    return runtime().run_skill("dummy_skill_1", {"request": request})
-
-
-@mcp.tool()
-def skill2_prepare_assistance(request: str = "") -> dict[str, Any]:
-    """Run dummy skill 2 for preparation of an assistive robot task.
-
-    Choose this when the user asks NurseArm to prepare, fetch, position, or get ready
-    to help. It simulates successful preparation without moving hardware.
-    """
-    return runtime().run_skill("dummy_skill_2", {"request": request})
-
-
-@mcp.tool()
-def skill3_confirm_handoff(request: str = "") -> dict[str, Any]:
-    """Run dummy skill 3 for completion or handoff requests.
-
-    Choose this when the user asks to finish an assistance sequence, hand something
-    over, or confirm completion. It simulates success without moving hardware.
-    """
-    return runtime().run_skill("dummy_skill_3", {"request": request})
+    result = runtime().run_skill("vla", {"task": task})
+    return {"skill": "vla", "task": task, **result}
 
 
 def main() -> None:
