@@ -22,8 +22,7 @@
   --radius-md: 16px;
   --splitter-size: 12px;
   --layout-left: 60%;
-  --layout-top: 33%;
-  --layout-mid: 33%;
+  --layout-top: 50%;
 }
 
 * {
@@ -89,7 +88,7 @@ button {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: 300px minmax(0, 1fr);
   gap: 16px;
   align-items: stretch;
 }
@@ -110,8 +109,12 @@ button {
   flex-direction: column;
   gap: 16px;
   min-height: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
 }
+
+.rail::-webkit-scrollbar { display: none; }
 
 .eyebrow,
 .panel-kicker,
@@ -193,11 +196,73 @@ h1 {
   line-height: 1.35;
 }
 
+/* ── Status cards with Chinese text + animated pulse dot ── */
+
+@keyframes status-pulse-glow {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.55; transform: scale(0.82); }
+}
+
+.status-card {
+  font-family: "PingFang HK", "Noto Sans CJK TC", "Microsoft JhengHei", "Hiragino Sans GB", sans-serif;
+  border-radius: 18px;
+  flex-shrink: 0;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 2px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: status-pulse-glow 2s ease-in-out infinite;
+}
+
+.status-online {
+  background: linear-gradient(135deg, rgba(46, 122, 98, 0.14), rgba(46, 122, 98, 0.04));
+  border: 1px solid rgba(46, 122, 98, 0.24);
+}
+
+.status-online .status-dot {
+  background: var(--safe);
+  box-shadow: 0 0 0 3px rgba(46, 122, 98, 0.22);
+}
+
+.status-online strong { color: var(--safe); }
+
+.status-synced {
+  background: linear-gradient(135deg, rgba(184, 134, 11, 0.14), rgba(184, 134, 11, 0.04));
+  border: 1px solid rgba(184, 134, 11, 0.24);
+}
+
+.status-synced .status-dot {
+  background: var(--gold);
+  box-shadow: 0 0 0 3px rgba(184, 134, 11, 0.22);
+}
+
+.status-synced strong { color: var(--gold); }
+
+.status-card strong em {
+  font-style: normal;
+  font-size: 0.78rem;
+  font-weight: 500;
+  opacity: 0.7;
+  letter-spacing: 0.01em;
+  margin-left: 4px;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
 .rail-remote {
   border-radius: 20px;
   padding: 12px 14px;
-  background: var(--gold-soft);
-  border: 1px solid rgba(184, 134, 11, 0.18);
+  background: var(--accent-soft);
+  border: 1px solid rgba(193, 39, 45, 0.18);
 }
 
 .qr-image {
@@ -213,7 +278,7 @@ h1 {
   display: block;
   margin-top: 6px;
   font-size: 0.82rem;
-  color: var(--gold);
+  color: var(--accent);
   word-break: break-all;
   text-decoration: none;
   font-weight: 600;
@@ -276,7 +341,7 @@ h1 {
 .camera-column {
   min-height: 0;
   display: grid;
-  grid-template-rows: minmax(200px, var(--layout-top)) var(--splitter-size) minmax(200px, var(--layout-mid)) var(--splitter-size) minmax(160px, 1fr);
+  grid-template-rows: minmax(200px, var(--layout-top)) var(--splitter-size) minmax(200px, 1fr);
 }
 
 .panel {
@@ -310,6 +375,16 @@ h2 {
   font-size: 1.12rem;
   line-height: 1.15;
   letter-spacing: -0.02em;
+}
+
+.zh-cam {
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  font-family: "PingFang HK", "Noto Sans CJK TC", "Microsoft JhengHei", sans-serif;
+  margin-left: 6px;
+  vertical-align: middle;
 }
 
 .panel-note {
@@ -407,6 +482,21 @@ h2 {
   background: rgba(0, 0, 0, 0.45);
   color: rgba(255, 255, 255, 0.55);
   border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* ── Robot controls in chat panel ───────────────────────────────────────────── */
+
+.chat-robot-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  background: rgba(28, 18, 8, 0.03);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  flex-shrink: 0;
 }
 
 /* ── Chat panel ─────────────────────────────────────────────────────────────── */
@@ -696,19 +786,53 @@ body.is-resizing-horizontal * {
   border: 0;
 }
 
-/* ── Robot panel ────────────────────────────────────────────────────────────── */
+/* ── Robot panel (now inside rail sidebar) ──────────────────────────────────── */
 
 .robot-panel {
   display: flex;
   flex-direction: column;
-  padding: 16px 20px 12px;
+  padding: 10px 0 0;
   min-height: 0;
+  border-top: 1px solid var(--line);
+  gap: 6px;
+  flex-shrink: 0;
 }
+
 
 .robot-controls {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.dir-btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 9px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dir-btn svg {
+  width: 15px;
+  height: 15px;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.robot-sep {
+  display: inline-block;
+  width: 1px;
+  height: 22px;
+  background: var(--line-strong);
+  align-self: center;
+  flex-shrink: 0;
+  margin: 0 2px;
 }
 
 .robot-btn {
@@ -741,21 +865,33 @@ body.is-resizing-horizontal * {
   box-shadow: 0 4px 12px rgba(139, 26, 30, 0.28);
 }
 
+.robot-3d {
+  display: block;
+  width: 100%;
+  height: 220px;
+  cursor: grab;
+  border-radius: 18px;
+  flex-shrink: 0;
+  background: rgba(28, 18, 8, 0.03);
+  border: 1px solid var(--line);
+}
+
+.robot-3d:active {
+  cursor: grabbing;
+}
+
 .motor-graph {
-  flex: 1;
-  min-height: 0;
+  flex: 0 0 52px;
   width: 100%;
   display: block;
-  border-radius: 14px;
+  border-radius: 10px;
   background: rgba(28, 18, 8, 0.04);
-  margin-top: 8px;
 }
 
 .motor-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 14px;
-  margin-top: 6px;
+  gap: 4px 10px;
   flex-shrink: 0;
 }
 
@@ -818,10 +954,6 @@ body.is-resizing-horizontal * {
 
   .camera-panel {
     min-height: 340px;
-  }
-
-  .robot-panel {
-    min-height: 220px;
   }
 
   .chat-panel {

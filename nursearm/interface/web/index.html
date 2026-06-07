@@ -31,21 +31,32 @@
           </div>
 
           <section class="rail-stack">
-            <article class="rail-card">
-              <span class="status-label">System</span>
-              <strong>Online</strong>
-              <span>Ready for operator input</span>
+            <article class="rail-card status-card status-online">
+              <div class="status-row">
+                <span class="status-dot"></span>
+                <span class="status-label">System · <span lang="zh-HK">系統</span></span>
+              </div>
+              <strong>Online <em lang="zh-HK">在線</em></strong>
+              <span>System ready · <span lang="zh-HK">系統就緒</span></span>
             </article>
-            <article class="rail-card">
-              <span class="status-label">Cameras</span>
-              <strong>Synced</strong>
-              <span>Live MJPEG stream</span>
+            <article class="rail-card status-card status-synced">
+              <div class="status-row">
+                <span class="status-dot"></span>
+                <span class="status-label">Cameras · <span lang="zh-HK">鏡頭</span></span>
+              </div>
+              <strong>Synced <em lang="zh-HK">同步</em></strong>
+              <span>Live stream · <span lang="zh-HK">直播已啟動</span></span>
             </article>
-            <article class="rail-card">
-              <span class="status-label">Audit</span>
-              <strong>Enabled</strong>
-              <span>Every action is logged</span>
-            </article>
+          </section>
+
+          <!-- 3D Digital Twin — big on desktop, shown in status tab on mobile -->
+          <canvas id="robot-3d" class="robot-3d" aria-label="SO-101 3D digital twin"></canvas>
+
+          <!-- Motor graph (status tab on mobile) -->
+          <section class="robot-panel" id="robot-panel">
+            <p class="panel-kicker">SO-101 · 關節位置</p>
+            <canvas id="motor-graph" class="motor-graph" aria-label="Motor position history"></canvas>
+            <div class="motor-legend" id="motor-legend" aria-hidden="true"></div>
           </section>
 
           <section id="remote-access" class="rail-remote" hidden>
@@ -59,30 +70,63 @@
             <p>Watch the camera overview, then issue short chat commands.</p>
           </section>
 
-          <!-- Victoria Harbour skyline silhouette -->
+          <!-- Victoria Harbour skyline silhouette — viewed from Tsim Sha Tsui -->
           <div class="hk-skyline" aria-hidden="true">
-            <svg viewBox="0 0 184 52" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
-              <rect x="0"   y="42" width="7"  height="10"/>
-              <rect x="9"   y="38" width="5"  height="14"/>
-              <rect x="16"  y="34" width="8"  height="18"/>
-              <rect x="26"  y="38" width="5"  height="14"/>
-              <rect x="33"  y="28" width="7"  height="24"/>
-              <rect x="42"  y="32" width="6"  height="20"/>
-              <rect x="50"  y="36" width="4"  height="16"/>
-              <rect x="51"  y="30" width="3"  height="6"/>
-              <polygon points="60,52 60,22 65,13 70,22 70,52"/>
-              <rect x="73"  y="20" width="6"  height="32"/>
-              <polygon points="82,52 82,10 86,3 90,10 90,52"/>
-              <rect x="93"  y="16" width="7"  height="36"/>
-              <rect x="102" y="22" width="8"  height="30"/>
-              <rect x="112" y="26" width="6"  height="26"/>
-              <polygon points="120,52 120,24 124,17 128,24 128,52"/>
-              <rect x="130" y="30" width="8"  height="22"/>
-              <rect x="140" y="34" width="7"  height="18"/>
-              <rect x="149" y="38" width="8"  height="14"/>
-              <rect x="159" y="40" width="6"  height="12"/>
-              <rect x="167" y="43" width="8"  height="9"/>
-              <rect x="177" y="46" width="7"  height="6"/>
+            <svg viewBox="0 0 220 64" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
+
+              <!-- Sheung Wan / Western district — low-rise backdrop -->
+              <rect x="0"   y="54" width="4"  height="10"/>
+              <rect x="5"   y="50" width="5"  height="14"/>
+              <rect x="12"  y="45" width="6"  height="19"/>
+              <rect x="20"  y="48" width="4"  height="16"/>
+              <rect x="26"  y="42" width="5"  height="22"/>
+              <rect x="33"  y="38" width="6"  height="26"/>
+
+              <!-- One IFC — medium-tall adjacent to IFC2 -->
+              <rect x="41"  y="28" width="7"  height="36"/>
+
+              <!-- Two IFC — tallest in HK Island, distinctive stepped crown + mast -->
+              <rect x="51"  y="6"  width="10" height="58"/>
+              <rect x="52"  y="3"  width="8"  height="5"/>
+              <rect x="54"  y="0"  width="4"  height="4"/>
+
+              <!-- Exchange Square / Jardine House area -->
+              <rect x="64"  y="24" width="7"  height="40"/>
+              <rect x="73"  y="28" width="6"  height="36"/>
+
+              <!-- HSBC Main Building — distinctive horizontal bands, raised on stilts -->
+              <rect x="81"  y="30" width="10" height="34"/>
+              <rect x="80"  y="26" width="12" height="6"/>
+              <rect x="82"  y="22" width="8"  height="6"/>
+
+              <!-- Bank of China Tower — MOST ICONIC: triangular prism, diagonal facets -->
+              <rect x="96"  y="34" width="10" height="30"/>
+              <polygon points="96,36 101,8 106,36"/>
+              <rect x="99"  y="4"  width="4"  height="6"/>
+
+              <!-- Cheung Kong Center — rectangular glass tower -->
+              <rect x="109" y="18" width="9"  height="46"/>
+
+              <!-- The Center — tall, octagonal, lit at night -->
+              <rect x="121" y="22" width="8"  height="42"/>
+
+              <!-- Central Plaza (Wan Chai) — VERY DISTINCTIVE: sharp triangular spire -->
+              <rect x="133" y="26" width="8"  height="38"/>
+              <polygon points="131,28 137,2 143,28"/>
+              <rect x="136" y="0"  width="2"  height="4"/>
+
+              <!-- Convention Centre area / Wan Chai towers -->
+              <rect x="145" y="30" width="7"  height="34"/>
+              <rect x="154" y="34" width="8"  height="30"/>
+
+              <!-- Causeway Bay — gradually tapering eastward -->
+              <rect x="164" y="38" width="7"  height="26"/>
+              <rect x="173" y="42" width="6"  height="22"/>
+              <rect x="181" y="45" width="7"  height="19"/>
+              <rect x="190" y="48" width="5"  height="16"/>
+              <rect x="197" y="51" width="6"  height="13"/>
+              <rect x="205" y="54" width="5"  height="10"/>
+              <rect x="212" y="57" width="8"  height="7"/>
             </svg>
             <p class="hk-credit">香港 · Hong Kong</p>
           </div>
@@ -91,12 +135,12 @@
         <main class="layout" id="layout">
           <section class="camera-column" id="camera-column">
 
-            <!-- Camera 1: RealSense top camera, palm detection overlay -->
+            <!-- Camera 1: RealSense top camera, bird-view -->
             <section class="panel camera-panel">
               <div class="panel-top">
                 <div>
                   <p class="panel-kicker">Camera 1 · Top view</p>
-                  <h2>Palm detection</h2>
+                  <h2>Bird-view camera <span class="zh-cam" lang="zh-HK">鳥瞰鏡頭</span></h2>
                 </div>
                 <span class="live-badge">Live</span>
               </div>
@@ -114,7 +158,7 @@
               <div class="panel-top">
                 <div>
                   <p class="panel-kicker">Camera 2 · Robot view</p>
-                  <h2>End-effector camera</h2>
+                  <h2>End-effector camera <span class="zh-cam" lang="zh-HK">末端鏡頭</span></h2>
                 </div>
                 <span class="live-badge">Live</span>
               </div>
@@ -122,25 +166,6 @@
               <div class="camera-stage">
                 <img id="camera-frame-2" class="camera-frame" alt="Camera 2 — robot arm end-effector view" src="/stream/2" />
               </div>
-            </section>
-
-            <div class="splitter splitter-horizontal" id="robot-splitter" role="separator" aria-label="Resize robot panel" aria-orientation="horizontal" tabindex="0"></div>
-
-            <!-- Motor graph + primitive controls -->
-            <section class="panel robot-panel" id="robot-panel">
-              <div class="panel-top">
-                <div>
-                  <p class="panel-kicker">SO-101 Follower · Motors</p>
-                  <h2>Joint positions</h2>
-                </div>
-                <div class="robot-controls" aria-label="Primitive skills">
-                  <button class="robot-btn" id="btn-home" title="Move to home pose">Home</button>
-                  <button class="robot-btn" id="btn-grip" title="Close gripper">Grip</button>
-                  <button class="robot-btn" id="btn-release" title="Open gripper">Release</button>
-                </div>
-              </div>
-              <canvas id="motor-graph" class="motor-graph" aria-label="Motor position history"></canvas>
-              <div class="motor-legend" id="motor-legend" aria-hidden="true"></div>
             </section>
 
           </section>
@@ -154,7 +179,43 @@
                 <h2>Operator instructions</h2>
                 <p class="panel-note">Use short, explicit prompts. The assistant will confirm actions and log them.</p>
               </div>
-              <span class="audit-badge">Audit on</span>
+            </div>
+
+            <div class="robot-controls chat-robot-controls" aria-label="Robot controls">
+              <button class="robot-btn" id="btn-home"    title="Move to home pose">Home</button>
+              <button class="robot-btn" id="btn-grip"    title="Close gripper">Grip</button>
+              <button class="robot-btn" id="btn-release" title="Open gripper">Release</button>
+              <span class="robot-sep" aria-hidden="true"></span>
+              <button class="robot-btn dir-btn" id="btn-up" title="Up (Z+)">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <line x1="8" y1="12" x2="8" y2="4"/><polyline points="4,8 8,4 12,8"/>
+                </svg>
+              </button>
+              <button class="robot-btn dir-btn" id="btn-down" title="Down (Z−)">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <line x1="8" y1="4" x2="8" y2="12"/><polyline points="4,8 8,12 12,8"/>
+                </svg>
+              </button>
+              <button class="robot-btn dir-btn" id="btn-forward" title="Forward (X+)">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="3,10 8,5 13,10"/><polyline points="3,13 8,8 13,13"/>
+                </svg>
+              </button>
+              <button class="robot-btn dir-btn" id="btn-back" title="Back (X−)">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="3,6 8,11 13,6"/><polyline points="3,3 8,8 13,3"/>
+                </svg>
+              </button>
+              <button class="robot-btn dir-btn" id="btn-left" title="Left (Y+)">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <line x1="12" y1="8" x2="4" y2="8"/><polyline points="8,4 4,8 8,12"/>
+                </svg>
+              </button>
+              <button class="robot-btn dir-btn" id="btn-right" title="Right (Y−)">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <line x1="4" y1="8" x2="12" y2="8"/><polyline points="8,4 12,8 8,12"/>
+                </svg>
+              </button>
             </div>
 
             <div class="chat-tip">Try: "Give me my morning pills."</div>
@@ -206,7 +267,7 @@
           <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
           <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
         </svg>
-        <span>Status</span>
+        <span>Info</span>
       </button>
     </nav>
 

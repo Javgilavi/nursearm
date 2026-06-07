@@ -16,8 +16,8 @@ from nursearm.robot.controller import RobotController
 mcp = FastMCP(
     "NurseArm",
     instructions=(
-        "Use only the exposed task-level tools. Dummy skills are safe integration tests "
-        "and never move hardware. Discover configured capabilities with list_skills."
+        "Use only the exposed task-level tools. Primitive skills move the robot directly; "
+        "the vla skill runs a learned policy. Discover all capabilities with list_skills."
     ),
     stateless_http=True,
     json_response=True,

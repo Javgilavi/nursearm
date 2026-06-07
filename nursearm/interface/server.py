@@ -277,7 +277,7 @@ class AppState:
         try:
             def _run() -> str:
                 # Consume the lazy generator inside this thread — do not return it.
-                segments, _ = model.transcribe(tmp_path, beam_size=5, vad_filter=True, language="en")
+                segments, _ = model.transcribe(tmp_path, beam_size=5, vad_filter=True)
                 return " ".join(s.text.strip() for s in segments).strip()
             return await asyncio.to_thread(_run)
         finally:
@@ -584,9 +584,11 @@ async def robot_state_view() -> dict[str, Any]:
 
 
 class RobotAction(BaseModel):
-    action: str   # "home" | "grip" | "release" | "jog"
+    action: str           # "home" | "grip" | "release" | "jog" | "move"
     joint: str | None = None
     delta: float | None = None
+    direction: str | None = None
+    step_m: float = 0.02
 
 
 @app.post("/robot/action")
@@ -603,6 +605,10 @@ async def robot_action(cmd: RobotAction) -> dict[str, Any]:
             if cmd.joint is None or cmd.delta is None:
                 raise HTTPException(status_code=400, detail="jog requires 'joint' and 'delta'")
             await asyncio.to_thread(state.robot.jog, cmd.joint, cmd.delta)
+        elif cmd.action == "move":
+            if cmd.direction is None:
+                raise HTTPException(status_code=400, detail="move requires 'direction'")
+            await asyncio.to_thread(state.robot.move_direction, cmd.direction, cmd.step_m)
         else:
             raise HTTPException(status_code=400, detail=f"Unknown action: {cmd.action!r}")
     except (ValueError, NotImplementedError) as exc:

@@ -1,7 +1,6 @@
 const layout = document.getElementById("layout");
 const cameraColumn = document.getElementById("camera-column");
 const cameraSplit = document.getElementById("camera-splitter");
-const robotSplit = document.getElementById("robot-splitter");
 const layoutSplit = document.getElementById("layout-splitter");
 const cameraFrames = [
   document.getElementById("camera-frame-1"),
@@ -17,7 +16,7 @@ const promptChips = document.querySelectorAll("[data-prompt]");
 // ── Layout persistence ────────────────────────────────────────────────────────
 
 const STORAGE_KEY = "nursearm.ui.sizes";
-const DEFAULTS = { left: 0.6, top: 0.33, mid: 0.33 };
+const DEFAULTS = { left: 0.6, top: 0.5 };
 
 const sizes = (() => {
   try {
@@ -27,7 +26,6 @@ const sizes = (() => {
     return {
       left: typeof parsed.left === "number" ? parsed.left : DEFAULTS.left,
       top:  typeof parsed.top  === "number" ? parsed.top  : DEFAULTS.top,
-      mid:  typeof parsed.mid  === "number" ? parsed.mid  : DEFAULTS.mid,
     };
   } catch {
     return { ...DEFAULTS };
@@ -52,15 +50,12 @@ function applyLayoutSizes() {
   layout.style.setProperty("--layout-left", `${leftPx}px`);
 
   const cameraRect = cameraColumn.getBoundingClientRect();
-  const splitterPx = 12 * 2; // two splitters
+  const splitterPx = 12; // one splitter
   const available = cameraRect.height - splitterPx;
   const minSlot = 160;
 
-  const topPx = clamp(available * sizes.top, minSlot, available - 2 * minSlot);
-  const midPx = clamp(available * sizes.mid, minSlot, available - topPx - minSlot);
-
+  const topPx = clamp(available * sizes.top, minSlot, available - minSlot);
   layout.style.setProperty("--layout-top", `${topPx}px`);
-  layout.style.setProperty("--layout-mid", `${midPx}px`);
 }
 
 function startResize(panel, event) {
@@ -70,10 +65,9 @@ function startResize(panel, event) {
   const layoutRect = layout.getBoundingClientRect();
   const cameraRect = cameraColumn.getBoundingClientRect();
   const startTop = sizes.top;
-  const startMid = sizes.mid;
   const startLeft = sizes.left;
 
-  const splitterPx = 12 * 2;
+  const splitterPx = 12;
   const available = cameraRect.height - splitterPx;
   const minSlot = 160;
 
@@ -86,12 +80,8 @@ function startResize(panel, event) {
       const nextLeft = clamp(startLeft * layoutRect.width + (moveEvent.clientX - startX), minLeft, maxLeft);
       sizes.left = nextLeft / layoutRect.width;
     } else if (panel === "cam") {
-      const nextTop = clamp(startTop * available + (moveEvent.clientY - startY), minSlot, available - 2 * minSlot);
+      const nextTop = clamp(startTop * available + (moveEvent.clientY - startY), minSlot, available - minSlot);
       sizes.top = nextTop / available;
-    } else if (panel === "robot") {
-      const topPx = sizes.top * available;
-      const nextMid = clamp(startMid * available + (moveEvent.clientY - startY), minSlot, available - topPx - minSlot);
-      sizes.mid = nextMid / available;
     }
     applyLayoutSizes();
     saveSizes();
@@ -110,7 +100,6 @@ function startResize(panel, event) {
 }
 
 cameraSplit.addEventListener("pointerdown", (e) => startResize("cam", e));
-robotSplit.addEventListener("pointerdown", (e) => startResize("robot", e));
 layoutSplit.addEventListener("pointerdown", (e) => startResize("vertical", e));
 window.addEventListener("resize", applyLayoutSizes);
 
@@ -236,7 +225,138 @@ async function pollRobotState() {
       }
     });
     drawGraph();
+    if (_robot3d) _robot3d.updateArm(pos);
   } catch { /* network error — silent */ }
+}
+
+// ── 3D Digital Twin (pure Canvas 2D — FK projection, drag to orbit) ──────────
+
+let _robot3d = null;
+
+function initRobot3D() {
+  const canvas3d = document.getElementById("robot-3d");
+  if (!canvas3d) return null;
+  const ctx = canvas3d.getContext("2d");
+  if (!ctx) return null;
+
+  const L1 = 0.100, L2 = 0.100, L3 = 0.100, L4 = 0.033;
+  const JSCALE = {
+    shoulder_pan:  (108.9 * Math.PI / 180) / 100,
+    shoulder_lift: (106.2 * Math.PI / 180) / 100,
+    elbow_flex:    (108.0 * Math.PI / 180) / 100,
+    wrist_flex:    (110.0 * Math.PI / 180) / 100,
+  };
+
+  let azimuth = 0.3;
+  let autoRotate = true;
+  let dragging = false, lastDragX = 0;
+  // Neutral horizontal pose for display until first sensor reading arrives
+  let currentPos = {
+    shoulder_pan: 0, shoulder_lift: 0,
+    elbow_flex: 0, wrist_flex: 0,
+    wrist_roll: 0, gripper: 0,
+  };
+
+  canvas3d.addEventListener("pointerdown", (e) => {
+    autoRotate = false;  // stop spinning on first click
+    dragging = true; lastDragX = e.clientX;
+    canvas3d.setPointerCapture(e.pointerId);
+  });
+  canvas3d.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    azimuth += (e.clientX - lastDragX) * 0.007;
+    lastDragX = e.clientX;
+  });
+  canvas3d.addEventListener("pointerup", () => { dragging = false; });
+
+  function fkPts(pos) {
+    const q1 = (pos.shoulder_pan  || 0) * JSCALE.shoulder_pan;
+    const q2 = (pos.shoulder_lift || 0) * JSCALE.shoulder_lift;
+    const q3 = (pos.elbow_flex    || 0) * JSCALE.elbow_flex;
+    const q4 = (pos.wrist_flex    || 0) * JSCALE.wrist_flex;
+    const c1 = Math.cos(q1), s1 = Math.sin(q1);
+    const c2 = Math.cos(q2), s2 = Math.sin(q2);
+    const c23 = Math.cos(q2 + q3), s23 = Math.sin(q2 + q3);
+    const c234 = Math.cos(q2 + q3 + q4), s234 = Math.sin(q2 + q3 + q4);
+    const spread = 0.013 * (1 - Math.min(100, Math.max(0, pos.gripper || 0)) / 100) + 0.004;
+    const p4x = L2 * c2 * c1 + L3 * c23 * c1 + L4 * c234 * c1;
+    const p4y = L2 * c2 * s1 + L3 * c23 * s1 + L4 * c234 * s1;
+    const p4z = L1 + L2 * s2 + L3 * s23 + L4 * s234;
+    return {
+      p0: [0, 0, 0],
+      p1: [0, 0, L1],
+      p2: [L2 * c2 * c1, L2 * c2 * s1, L1 + L2 * s2],
+      p3: [L2 * c2 * c1 + L3 * c23 * c1, L2 * c2 * s1 + L3 * c23 * s1, L1 + L2 * s2 + L3 * s23],
+      p4: [p4x, p4y, p4z],
+      fL: [p4x + spread * Math.sin(q1), p4y - spread * Math.cos(q1), p4z],
+      fR: [p4x - spread * Math.sin(q1), p4y + spread * Math.cos(q1), p4z],
+    };
+  }
+
+  const EL = 0.22;  // elevation: gentle tilt, no extreme foreshortening
+  function orbitProject(x, y, z, cx, cy, sc) {
+    const cosA = Math.cos(azimuth), sinA = Math.sin(azimuth);
+    const rx = x * cosA - y * sinA;
+    const ry = x * sinA + y * cosA;
+    const sy = z * Math.cos(EL) - ry * Math.sin(EL);
+    const depth = z * Math.sin(EL) + ry * Math.cos(EL);
+    const f = 0.9 / Math.max(0.3, 0.9 + depth - 0.1);
+    return [cx + rx * sc * f, cy + sy * sc * f, depth];  // +sy: 180° vertical flip
+  }
+
+  (function render() {
+    const dpr = window.devicePixelRatio || 1;
+    const cw = canvas3d.clientWidth;
+    const ch = canvas3d.clientHeight;
+    if (cw === 0 || ch === 0) { requestAnimationFrame(render); return; }
+    if (canvas3d.width !== cw * dpr || canvas3d.height !== ch * dpr) {
+      canvas3d.width = cw * dpr;
+      canvas3d.height = ch * dpr;
+      ctx.scale(dpr, dpr);
+    }
+
+    ctx.clearRect(0, 0, cw, ch);
+
+    if (autoRotate) azimuth += 0.004;
+    const cx = cw * 0.46, cy = ch * 0.32;  // base at upper-third, arm hangs into lower canvas
+    const sc = Math.min(cw, ch) * 2.4;
+    const pt = (p) => orbitProject(p[0], p[1], p[2], cx, cy, sc);
+
+    const { p0, p1, p2, p3, p4, fL, fR } = fkPts(currentPos);
+    const pts0 = pt(p0), pts1 = pt(p1), pts2 = pt(p2),
+          pts3 = pt(p3), pts4 = pt(p4), ptfL = pt(fL), ptfR = pt(fR);
+    const w = Math.max(2.5, Math.min(cw, ch) * 0.028);
+
+    const segs = [
+      { a: pts1, b: pts2, color: "rgba(193,39,45,0.95)", lw: w * 1.2 },
+      { a: pts2, b: pts3, color: "rgba(160,32,37,0.95)", lw: w * 1.2 },
+      { a: pts3, b: pts4, color: "rgba(135,26,30,0.95)", lw: w * 0.8 },
+      { a: pts4, b: ptfL, color: "rgba(46,122,98,0.95)", lw: w * 0.45 },
+      { a: pts4, b: ptfR, color: "rgba(46,122,98,0.95)", lw: w * 0.45 },
+    ].sort((a, b) => (b.a[2] + b.b[2]) - (a.a[2] + a.b[2]));
+
+    segs.forEach(({ a, b, color, lw }) => {
+      ctx.strokeStyle = "rgba(0,0,0,0.22)";
+      ctx.lineWidth = lw + 2;
+      ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(a[0] + 1.5, a[1] + 1.5); ctx.lineTo(b[0] + 1.5, b[1] + 1.5); ctx.stroke();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lw;
+      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+    });
+
+    const jr = w * 0.65;
+    [pts2, pts3].forEach((p) => {
+      ctx.fillStyle = "rgba(0,0,0,0.22)";
+      ctx.beginPath(); ctx.arc(p[0] + 1, p[1] + 1, jr, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "rgba(184,134,11,0.95)";
+      ctx.beginPath(); ctx.arc(p[0], p[1], jr, 0, Math.PI * 2); ctx.fill();
+    });
+
+    requestAnimationFrame(render);
+  })();
+
+  return { updateArm: (pos) => { currentPos = { ...pos }; } };
 }
 
 // ── Robot primitive buttons ───────────────────────────────────────────────────
@@ -258,6 +378,12 @@ async function robotAction(action, extra = {}) {
 document.getElementById("btn-home")?.addEventListener("click", () => robotAction("home"));
 document.getElementById("btn-grip")?.addEventListener("click", () => robotAction("grip"));
 document.getElementById("btn-release")?.addEventListener("click", () => robotAction("release"));
+
+["up", "down", "forward", "back", "left", "right"].forEach((dir) => {
+  document.getElementById(`btn-${dir}`)?.addEventListener("click", () =>
+    robotAction("move", { direction: dir, step_m: 0.02 })
+  );
+});
 
 // ── Chat ──────────────────────────────────────────────────────────────────────
 
@@ -476,6 +602,7 @@ window.addEventListener("load", () => {
   applyLayoutSizes();
   startCameras();
   buildLegend();
+  _robot3d = initRobot3D();
   if (window.matchMedia("(min-width: 769px)").matches) {
     chatInput.focus();
   }

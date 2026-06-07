@@ -1,97 +1,93 @@
-# Skill registry. Primitive skills emit direct commands; VLA skills run a
-# language-conditioned policy using prompt/task and policy_path.
+# Skill registry. Primitive skills emit direct commands to the robot.
+# VLA skills run a language-conditioned lerobot policy rollout.
+# Set policy_path once a model is trained.
 
 skills:
-  dummy_skill_1:
+  home:
     type: primitive
-    class: nursearm.skills.dummy.DummySkill1
+    class: nursearm.skills.primitives.HomeSkill
     description: >
-      Safe integration-test skill for requests to inspect, check, assess, or observe
-      the environment. It does not use the camera and never moves the robot.
+      Move the robot arm to its home/rest position. Use before and after
+      any manipulation task to return to a safe neutral pose.
     enabled: true
 
-  dummy_skill_2:
+  grip:
     type: primitive
-    class: nursearm.skills.dummy.DummySkill2
+    class: nursearm.skills.primitives.GripSkill
     description: >
-      Safe integration-test skill for requests to prepare, fetch, position, or get
-      ready to provide assistance. It never moves the robot.
+      Close the gripper to grasp an object. Use when the arm is positioned
+      over the target object and ready to pick it up.
     enabled: true
 
-  dummy_skill_3:
+  release:
     type: primitive
-    class: nursearm.skills.dummy.DummySkill3
+    class: nursearm.skills.primitives.ReleaseSkill
     description: >
-      Safe integration-test skill for requests to finish an assistance sequence,
-      hand something over, or confirm completion. It never moves the robot.
+      Open the gripper to release a held object. Use when the arm has
+      delivered the object to the target location.
     enabled: true
 
   move_up:
     type: primitive
     class: nursearm.skills.primitives.MoveUp
     description: >
-      Move the robot end effector up by a small fixed step. Args: {step_m: <metres>}.
+      Move the robot end-effector up by one step (default 3 cm) via IK.
+      Args: {step_m: <metres>}.
     enabled: true
 
   move_down:
     type: primitive
     class: nursearm.skills.primitives.MoveDown
     description: >
-      Move the robot end effector down by a small fixed step. Args: {step_m: <metres>}.
+      Move the robot end-effector down by one step (default 3 cm) via IK.
+      Args: {step_m: <metres>}.
+    enabled: true
+
+  move_forward:
+    type: primitive
+    class: nursearm.skills.primitives.MoveForward
+    description: >
+      Move the robot end-effector forward (away from base) by one step
+      (default 3 cm) via IK. Args: {step_m: <metres>}.
+    enabled: true
+
+  move_back:
+    type: primitive
+    class: nursearm.skills.primitives.MoveBack
+    description: >
+      Move the robot end-effector backward (toward base) by one step
+      (default 3 cm) via IK. Args: {step_m: <metres>}.
+    enabled: true
+
+  move_left:
+    type: primitive
+    class: nursearm.skills.primitives.MoveLeft
+    description: >
+      Move the robot end-effector left by one step (default 3 cm) via IK.
+      Args: {step_m: <metres>}.
+    enabled: true
+
+  move_right:
+    type: primitive
+    class: nursearm.skills.primitives.MoveRight
+    description: >
+      Move the robot end-effector right by one step (default 3 cm) via IK.
+      Args: {step_m: <metres>}.
     enabled: true
 
   vla:
     type: vla
-    class: nursearm.skills.dummy.DummyVLASkill
+    class: nursearm.skills.vla.NurseArmVLA
     description: >
-      The NurseArm VLA (Vision-Language-Action) policy. Accepts any physical assistance
-      task described in natural language and figures out the arm motions internally.
-      Use for medication dispensing, feeding, picking up objects, or any manipulation task.
+      The NurseArm VLA (Vision-Language-Action) policy. Accepts any physical
+      assistance task described in natural language and figures out the arm
+      motions from the live camera and task description. Use for medication
+      dispensing, feeding, picking up objects, or any manipulation task.
+      Set policy_path to the trained lerobot checkpoint when ready.
       Args: {task: <natural language description>}.
     task: "execute the requested physical assistance task"
-    policy_path: null   # replace with trained policy path when ready
+    policy_path: null
     enabled: true
-
-  # Individual VLA skill stubs — disabled while the single VLA policy is in use.
-  # Re-enable and set policy_path when task-specific policies are trained.
-  dispense_pills:
-    type: vla
-    class: nursearm.skills.dispense_pills.DispensePills
-    description: >
-      Find today's prescribed pill among the pills on the table, pick it up, and place
-      it in the cup. Use when the person asks for their medication. Args: {pill: <name>}.
-    task: "pick the correct pill and place it in the cup"
-    policy_path: null
-    enabled: false
-
-  feed_person:
-    type: vla
-    class: nursearm.skills.feed_person.FeedPerson
-    description: >
-      Scoop food from the bowl and bring the spoon to the person's mouth, stopping safely
-      short. Use when the person asks to be fed. Args: {food: <name>}.
-    task: "scoop food and bring it to the person's mouth"
-    policy_path: null
-    enabled: false
-
-  gaze_pick:
-    type: vla
-    class: nursearm.skills.gaze_pick.GazePick
-    description: >
-      Pick up the object the person is looking at. Use when they say "give me that" while
-      looking at an item. (Stretch skill.)
-    task: "pick up the object the person is looking at"
-    policy_path: null
-    enabled: false   # enable once trained — keeps the judge's choices to working skills
-
-  hand_handoff:
-    type: vla
-    class: nursearm.skills.hand_handoff.HandHandoff
-    description: >
-      Place the held object safely into the person's open palm. Use to hand something over.
-    task: "place the object into the person's open hand"
-    policy_path: null
-    enabled: false
 
 # Used by integrations.calendar.MockCalendarClient when USE_GOOGLE_CALENDAR != 1.
 mock_medication_schedule:

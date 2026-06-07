@@ -16,14 +16,14 @@ from nursearm.types import Point3D
 
 logger = logging.getLogger(__name__)
 
-# Home pose: arm upright, centred, gripper open.
+# Home pose — measured from the physical robot at its rest position.
 _HOME_POSE: dict[str, float] = {
-    "shoulder_pan":  0.0,
-    "shoulder_lift": 0.0,
-    "elbow_flex":    0.0,
-    "wrist_flex":    0.0,
-    "wrist_roll":    0.0,
-    "gripper":       0.0,
+    "shoulder_pan":  16.74,
+    "shoulder_lift": -96.69,
+    "elbow_flex":    99.02,
+    "wrist_flex":    69.80,
+    "wrist_roll":    -0.02,
+    "gripper":        4.84,
 }
 
 _GRIP_CLOSED = 80.0   # gripper closed (% of range)
@@ -77,6 +77,7 @@ class RobotController:
 
     def _move_then_relax(self, positions: dict[str, float], settle_s: float = 0.8) -> None:
         """Write goal positions, wait for motion to settle, then disable torque."""
+        self._bus.set_torque(True)
         self._bus.write_positions(positions)
         time.sleep(settle_s)
         self._bus.set_torque(False)
@@ -138,6 +139,26 @@ class RobotController:
         target = max(lo, min(hi, current.get(joint, 0.0) + delta))
         self._move_then_relax({joint: target}, settle_s=0.6)
         self._current_pose[joint] = target
+
+    def move_direction(self, direction: str, step_m: float = 0.02) -> None:
+        """Move the end-effector by `step_m` metres in a Cartesian direction.
+
+        Valid directions: up, down, forward, back, left, right.
+        Uses analytical FK + numerical IK from nursearm.robot.kinematics.
+        """
+        from nursearm.robot.kinematics import step_direction  # noqa: PLC0415
+
+        if self.mock:
+            logger.info("[mock] move_direction(%s, step=%.3f m)", direction, step_m)
+            new_joints = step_direction(self._current_pose, direction, step_m)
+            self._current_pose.update(new_joints)
+            return
+        if self._bus is None:
+            return
+        current = self.get_state()
+        new_joints = step_direction(current, direction, step_m)
+        self._move_then_relax(new_joints, settle_s=0.6)
+        self._current_pose.update(new_joints)
 
     def run_policy(self, policy_path: str | None, task: str, target: Point3D | None = None) -> None:
         """Run a trained-skill rollout via lerobot-rollout subprocess."""
