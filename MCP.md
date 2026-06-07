@@ -19,6 +19,10 @@ NURSEARM_MOCK=1 uv run nursearm-mcp-client --list-tools
 NURSEARM_MOCK=1 uv run nursearm-mcp-client \
   --call run_skill \
   --arguments '{"name":"move_right","args":{"step_m":0.02}}'
+
+NURSEARM_MOCK=1 uv run nursearm-mcp-client \
+  --call handover_pill \
+  --arguments '{"color":"green"}'
 ```
 
 ## Streamable HTTP
@@ -65,5 +69,6 @@ codex mcp add --env NURSEARM_MOCK=1 nursearm -- \
 | `list_skills` | Return every enabled registry skill |
 | `get_scene` | Return hand openness, palm point, palm-up state, and confidence |
 | `run_skill` | Execute an enabled skill by name |
+| `handover_pill` | Run the pill handover ACT policy for `green` or `black` |
 
 The server does not expose shell commands or raw motor registers.

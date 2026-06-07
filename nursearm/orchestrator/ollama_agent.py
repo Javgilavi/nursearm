@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 from typing import Any
 
@@ -29,6 +30,7 @@ Keep final answers concise and clear.
 
 
 THINK_BLOCK_RE = re.compile(r"<think>.*?</think>", flags=re.DOTALL | re.IGNORECASE)
+logger = logging.getLogger(__name__)
 
 
 class OllamaUnavailableError(RuntimeError):
@@ -62,6 +64,7 @@ class OllamaMCPAgent:
             return await self._handle_locked(user_intent)
 
     async def _handle_locked(self, user_intent: str) -> str:
+        logger.info("Ollama agent handling request with model %s", self.model)
         self._log({"event": "user_intent", "text": user_intent})
         self.messages.append({"role": "user", "content": user_intent})
         tools = [
@@ -77,6 +80,7 @@ class OllamaMCPAgent:
         ]
 
         for _ in range(MAX_TURNS):
+            logger.info("Waiting for Ollama response")
             message = await self._chat(self.messages, tools)
             self.messages.append(message)
             tool_calls = message.get("tool_calls") or []
@@ -88,12 +92,14 @@ class OllamaMCPAgent:
                 recovered = self._recover_tool_call(content)
                 if recovered:
                     name, arguments = recovered
+                    logger.info("Ollama selected MCP tool %s", name)
                     result = await self.mcp.call_tool(name, arguments)
                     self._log({"event": "mcp_tool", "tool": name, "args": arguments, "result": result})
                     self.messages.append({"role": "tool", "tool_name": name, "content": json.dumps(result)})
                     continue
 
                 reply = self._clean_reply(content)
+                logger.info("Ollama returned final response")
                 self._log({"event": "report", "text": reply})
                 self._trim_history()
                 return reply or "The local model returned an empty response."
@@ -104,6 +110,7 @@ class OllamaMCPAgent:
                 arguments = function.get("arguments") or {}
                 if isinstance(arguments, str):
                     arguments = json.loads(arguments)
+                logger.info("Ollama selected MCP tool %s", name)
                 result = await self.mcp.call_tool(name, arguments)
                 self._log(
                     {

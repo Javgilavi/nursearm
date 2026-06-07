@@ -13,7 +13,7 @@ async def run() -> None:
     await client.connect()
     try:
         tools = {tool.name for tool in await client.list_tools()}
-        expected = {"list_skills", "get_scene", "run_skill"}
+        expected = {"list_skills", "get_scene", "run_skill", "handover_pill"}
         missing = expected - tools
         if missing:
             raise AssertionError(f"missing MCP tools: {sorted(missing)}")
@@ -31,6 +31,7 @@ async def run() -> None:
             "move_left",
             "move_right",
             "sort_pills",
+            "handover_pill",
         }
         if names != expected_skills:
             raise AssertionError(f"unexpected skills: {sorted(names)}")
@@ -46,7 +47,14 @@ async def run() -> None:
         if policy_result.get("success"):
             raise AssertionError("sort_pills must not report success without a checkpoint")
 
-        print("PASS tools, registry, home primitive, and missing-policy failure")
+        handover_result = await client.call_tool(
+            "run_skill",
+            {"name": "handover_pill", "args": {"color": "blue"}},
+        )
+        if handover_result.get("success") or "green" not in handover_result.get("note", ""):
+            raise AssertionError(f"handover_pill validation returned {handover_result!r}")
+
+        print("PASS tools, registry, home primitive, and policy validation")
     finally:
         await client.close()
 

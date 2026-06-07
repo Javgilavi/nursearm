@@ -1,7 +1,9 @@
+const workspace = document.querySelector(".workspace");
 const layout = document.getElementById("layout");
 const cameraColumn = document.getElementById("camera-column");
 const cameraSplit = document.getElementById("camera-splitter");
 const layoutSplit = document.getElementById("layout-splitter");
+const railSplit = document.getElementById("rail-splitter");
 const cameraFrames = [
   document.getElementById("camera-frame-1"),
   document.getElementById("camera-frame-2"),
@@ -12,11 +14,15 @@ const sendButton = document.querySelector(".send-button");
 const micButton = document.getElementById("mic-button");
 const chatMessages = document.getElementById("chat-messages");
 const promptChips = document.querySelectorAll("[data-prompt]");
+const handoverButtons = document.querySelectorAll("[data-handover-color]");
+const openClawStatus = document.getElementById("openclaw-status");
+const openClawStatusLabel = document.getElementById("openclaw-status-label");
+let remoteUrl = null;
 
 // ── Layout persistence ────────────────────────────────────────────────────────
 
 const STORAGE_KEY = "nursearm.ui.sizes";
-const DEFAULTS = { left: 0.6, top: 0.5 };
+const DEFAULTS = { rail: 300, left: 0.6, top: 0.5 };
 
 const sizes = (() => {
   try {
@@ -24,6 +30,7 @@ const sizes = (() => {
     if (!raw) return { ...DEFAULTS };
     const parsed = JSON.parse(raw);
     return {
+      rail: typeof parsed.rail === "number" ? parsed.rail : DEFAULTS.rail,
       left: typeof parsed.left === "number" ? parsed.left : DEFAULTS.left,
       top:  typeof parsed.top  === "number" ? parsed.top  : DEFAULTS.top,
     };
@@ -41,6 +48,16 @@ function clamp(value, min, max) {
 }
 
 function applyLayoutSizes() {
+  if (window.matchMedia("(min-width: 1181px)").matches) {
+    const workspaceRect = workspace.getBoundingClientRect();
+    const minRail = 230;
+    const minMain = 852;
+    const splitterPx = 12;
+    const maxRail = Math.max(minRail, Math.min(480, workspaceRect.width - minMain - splitterPx));
+    sizes.rail = clamp(sizes.rail, minRail, maxRail);
+    workspace.style.setProperty("--rail-width", `${sizes.rail}px`);
+  }
+
   const rect = layout.getBoundingClientRect();
   const minLeft = 320;
   const minRight = 340;
@@ -63,7 +80,9 @@ function startResize(panel, event) {
   const startY = event.clientY;
   const startX = event.clientX;
   const layoutRect = layout.getBoundingClientRect();
+  const workspaceRect = workspace.getBoundingClientRect();
   const cameraRect = cameraColumn.getBoundingClientRect();
+  const startRail = sizes.rail;
   const startTop = sizes.top;
   const startLeft = sizes.left;
 
@@ -72,7 +91,12 @@ function startResize(panel, event) {
   const minSlot = 160;
 
   const onMove = (moveEvent) => {
-    if (panel === "vertical") {
+    if (panel === "rail") {
+      const minRail = 230;
+      const minMain = 852;
+      const maxRail = Math.max(minRail, Math.min(480, workspaceRect.width - minMain - splitterPx));
+      sizes.rail = clamp(startRail + (moveEvent.clientX - startX), minRail, maxRail);
+    } else if (panel === "vertical") {
       const minLeft = 320;
       const minRight = 340;
       const gutter = 12;
@@ -93,7 +117,7 @@ function startResize(panel, event) {
     document.body.classList.remove("is-resizing", "is-resizing-vertical", "is-resizing-horizontal");
   };
 
-  const orientation = panel === "vertical" ? "vertical" : "horizontal";
+  const orientation = panel === "cam" ? "horizontal" : "vertical";
   document.body.classList.add("is-resizing", `is-resizing-${orientation}`);
   document.addEventListener("pointermove", onMove);
   document.addEventListener("pointerup", onUp);
@@ -101,6 +125,7 @@ function startResize(panel, event) {
 
 cameraSplit.addEventListener("pointerdown", (e) => startResize("cam", e));
 layoutSplit.addEventListener("pointerdown", (e) => startResize("vertical", e));
+railSplit.addEventListener("pointerdown", (e) => startResize("rail", e));
 window.addEventListener("resize", applyLayoutSizes);
 
 // ── Cameras ───────────────────────────────────────────────────────────────────
@@ -318,8 +343,8 @@ function initRobot3D() {
     ctx.clearRect(0, 0, cw, ch);
 
     if (autoRotate) azimuth += 0.004;
-    const cx = cw * 0.46, cy = ch * 0.32;  // base at upper-third, arm hangs into lower canvas
-    const sc = Math.min(cw, ch) * 2.4;
+    const cx = cw * 0.46, cy = ch * 0.22;
+    const sc = Math.min(cw, 300) * 2.85;
     const pt = (p) => orbitProject(p[0], p[1], p[2], cx, cy, sc);
 
     const { p0, p1, p2, p3, p4, fL, fR } = fkPts(currentPos);
@@ -412,6 +437,11 @@ function showSpinner() {
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
+function showActivity(text) {
+  showSpinner();
+  loadingBubble.textContent = text;
+}
+
 function hideSpinner() {
   if (loadingBubble) {
     loadingBubble.remove();
@@ -429,11 +459,14 @@ async function onSubmit(event) {
   setLoading(true);
   showSpinner();
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 125000);
   try {
     const response = await fetch("/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
+      signal: controller.signal,
     });
     const payload = await response.json();
     hideSpinner();
@@ -441,10 +474,16 @@ async function onSubmit(event) {
       "assistant",
       response.ok ? payload.reply : `Error: ${payload.detail || payload.error || "request failed"}`
     );
-  } catch {
+  } catch (error) {
     hideSpinner();
-    appendMessage("assistant", "Cannot reach the NurseArm backend.");
+    appendMessage(
+      "assistant",
+      error.name === "AbortError"
+        ? "The LLM did not respond within 125 seconds."
+        : "Cannot reach the NurseArm backend."
+    );
   } finally {
+    clearTimeout(timeout);
     setLoading(false);
     chatInput.focus();
   }
@@ -537,6 +576,45 @@ promptChips.forEach((chip) => {
   });
 });
 
+handoverButtons.forEach((button) => {
+  button.addEventListener("click", async () => {
+    const color = button.dataset.handoverColor;
+    if (!color) return;
+
+    appendMessage("user", `Run ACT handover for the ${color} pill.`);
+    setLoading(true);
+    handoverButtons.forEach((item) => { item.disabled = true; });
+    showActivity(`Running ${color} pill ACT policy…`);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 180000);
+    try {
+      const response = await fetch("/skills/handover-pill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ color }),
+        signal: controller.signal,
+      });
+      const payload = await response.json();
+      hideSpinner();
+      const note = payload.note || payload.detail || "Handover request finished.";
+      appendMessage("assistant", response.ok ? note : `Error: ${note}`);
+    } catch (error) {
+      hideSpinner();
+      appendMessage(
+        "assistant",
+        error.name === "AbortError"
+          ? "The ACT rollout did not finish within 180 seconds."
+          : "Cannot reach the NurseArm backend."
+      );
+    } finally {
+      clearTimeout(timeout);
+      setLoading(false);
+      handoverButtons.forEach((item) => { item.disabled = false; });
+    }
+  });
+});
+
 // ── Mobile tabs ───────────────────────────────────────────────────────────────
 
 const mobileTabBtns = document.querySelectorAll(".mobile-tab-btn");
@@ -582,20 +660,36 @@ async function pollPalmStatus() {
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 
-async function loadRemoteUrl() {
+function updateOpenClawStatus(status) {
+  if (!openClawStatus || !openClawStatusLabel) return;
+  const active = status?.active === true;
+  openClawStatus.classList.toggle("bot-status-active", active);
+  openClawStatus.classList.toggle("bot-status-offline", !active);
+  openClawStatusLabel.textContent = active ? "Active" : "Offline";
+  openClawStatus.title = active
+    ? "OpenClaw container heartbeat received"
+    : "No recent heartbeat from the OpenClaw container";
+}
+
+async function pollHealth() {
   try {
     const r = await fetch("/health");
+    if (!r.ok) throw new Error("health request failed");
     const data = await r.json();
-    if (data.ngrok_url) {
+    updateOpenClawStatus(data.openclaw);
+    if (data.ngrok_url && data.ngrok_url !== remoteUrl) {
       const section = document.getElementById("remote-access");
       const link = document.getElementById("ngrok-link");
       const qrImg = document.getElementById("qr-image");
+      remoteUrl = data.ngrok_url;
       link.href = data.ngrok_url;
       link.textContent = data.ngrok_url.replace("https://", "");
       qrImg.src = "/qr.svg";
       section.hidden = false;
     }
-  } catch { /* server not ready yet — silent */ }
+  } catch {
+    updateOpenClawStatus(null);
+  }
 }
 
 window.addEventListener("load", () => {
@@ -606,8 +700,9 @@ window.addEventListener("load", () => {
   if (window.matchMedia("(min-width: 769px)").matches) {
     chatInput.focus();
   }
-  loadRemoteUrl();
+  pollHealth();
   pollPalmStatus();
+  setInterval(pollHealth, 1000);
   setInterval(pollPalmStatus, 1000);
   setInterval(pollRobotState, 1000 / POLL_HZ);
 });

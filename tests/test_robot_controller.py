@@ -42,11 +42,10 @@ def test_run_policy_releases_bus_and_reconnects(monkeypatch: Any) -> None:
     assert reconnects == [True]
     assert commands == [
         [
-            "lerobot-rollout",
+            controller.rollout_executable,
             "--strategy.type=base",
             "--policy.path=/tmp/checkpoint",
             f"--policy.device={controller.policy_device}",
-            f"--policy.temporal_ensemble_coeff={controller.temporal_ensemble_coeff}",
             "--robot.type=so101_follower",
             f"--robot.port={controller.port}",
             f"--robot.id={controller.robot_id}",
@@ -56,3 +55,19 @@ def test_run_policy_releases_bus_and_reconnects(monkeypatch: Any) -> None:
             "--duration=12",
         ]
     ]
+
+
+def test_run_policy_adds_temporal_ensemble_when_configured(monkeypatch: Any) -> None:
+    controller = RobotController(mock=True)
+    controller.mock = False
+    controller.temporal_ensemble_coeff = 0.01
+
+    commands: list[list[str]] = []
+    monkeypatch.setattr(
+        "nursearm.robot.controller.subprocess.run",
+        lambda command, check: commands.append(command),
+    )
+
+    controller.run_policy("/tmp/checkpoint", task="handover", duration_s=1)
+
+    assert "--policy.temporal_ensemble_coeff=0.01" in commands[0]

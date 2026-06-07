@@ -63,4 +63,5 @@ echo "Setting model…"
 openclaw models set "anthropic/claude-sonnet-4-6" 2>&1 || true
 
 echo "Starting OpenClaw gateway…"
+python3 /app/heartbeat.py &
 exec openclaw gateway

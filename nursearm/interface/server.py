@@ -26,7 +26,7 @@ import tempfile
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 import cv2
 import numpy as np
@@ -49,8 +49,15 @@ from nursearm.types import SceneObservation
 AGENT_BACKEND = os.getenv("AGENT_BACKEND", "ollama").lower()  # "ollama" | "claude"
 
 class _NoiseFilter(logging.Filter):
-    """Drop repetitive 404s from external tools polling our server."""
-    _SKIP = ("/api/boxes/", "/ws/robot_state")
+    """Drop repetitive polling requests from the Uvicorn access log."""
+    _SKIP = (
+        "/api/boxes/",
+        "/ws/robot_state",
+        "GET /robot/state ",
+        "GET /palm/status ",
+        "GET /health ",
+        "GET /qr.svg",
+    )
 
     def filter(self, record: logging.LogRecord) -> bool:
         msg = record.getMessage()
@@ -59,6 +66,7 @@ class _NoiseFilter(logging.Filter):
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("uvicorn.access").addFilter(_NoiseFilter())
+logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 MOCK = os.getenv("NURSEARM_MOCK", "0") == "1"
@@ -129,6 +137,33 @@ class AppState:
         await self.mcp.close()
         self.robot.disconnect()
         self.perception.close()
+
+    async def run_handover(self, arguments: dict[str, Any]) -> dict[str, Any]:
+        """Release UI camera handles, run ACT, then restore the live streams."""
+        camera_tasks = [task for task in (self._camera_task, self._cam2_task) if task is not None]
+        for task in camera_tasks:
+            task.cancel()
+        if camera_tasks:
+            await asyncio.gather(*camera_tasks, return_exceptions=True)
+        self._camera_task = None
+        self._cam2_task = None
+        if self._cam2_capture is not None:
+            self._cam2_capture.release()
+            self._cam2_capture = None
+        self.perception.close()
+
+        try:
+            result = await asyncio.to_thread(
+                self.skills.run,
+                "handover_pill",
+                arguments,
+                self.robot,
+                self.perception,
+            )
+            return result.summary()
+        finally:
+            self._camera_task = asyncio.create_task(self._camera_loop())
+            self._cam2_task = asyncio.create_task(self._camera2_loop())
 
     # -- camera background task --------------------------------------------------
 
@@ -337,6 +372,18 @@ class AppState:
 
 state: AppState | None = None
 _ngrok_url: str | None = None
+_openclaw_last_seen: float | None = None
+_OPENCLAW_ACTIVE_WINDOW_S = 8
+
+
+def _openclaw_status() -> dict[str, Any]:
+    if _openclaw_last_seen is None:
+        return {"active": False, "last_seen_seconds_ago": None}
+    age = max(0.0, time.monotonic() - _openclaw_last_seen)
+    return {
+        "active": age <= _OPENCLAW_ACTIVE_WINDOW_S,
+        "last_seen_seconds_ago": round(age, 1),
+    }
 
 
 def _ensure_ollama() -> None:
@@ -439,7 +486,20 @@ async def static_file(path: str) -> FileResponse:
 @app.get("/health")
 async def health() -> dict[str, Any]:
     ollama = await state.agent.model_status() if state.agent else {"available": False}
-    return {"ok": True, "mock": MOCK, "ollama": ollama, "ngrok_url": _ngrok_url}
+    return {
+        "ok": True,
+        "mock": MOCK,
+        "ollama": ollama,
+        "ngrok_url": _ngrok_url,
+        "openclaw": _openclaw_status(),
+    }
+
+
+@app.post("/integrations/openclaw/heartbeat")
+async def openclaw_heartbeat() -> dict[str, bool]:
+    global _openclaw_last_seen
+    _openclaw_last_seen = time.monotonic()
+    return {"ok": True}
 
 
 @app.get("/qr.svg")
@@ -452,8 +512,12 @@ async def qr_svg() -> Response:
     import segno
     qr = segno.make_qr(_ngrok_url, error="m")
     buf = io.BytesIO()
-    qr.save(buf, kind="svg", scale=5, border=2, dark="#236f7f", light="#ffffff")
-    return Response(content=buf.getvalue(), media_type="image/svg+xml")
+    qr.save(buf, kind="svg", scale=5, border=2, dark="#c1272d", light="#fff9f1")
+    return Response(
+        content=buf.getvalue(),
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @app.get("/state")
@@ -558,11 +622,38 @@ async def transcribe(audio: Annotated[UploadFile, File()]) -> dict[str, str]:
 
 @app.post("/chat")
 async def chat(msg: ChatIn) -> dict[str, str]:
+    logger.info("Chat request started: %s", msg.text)
     try:
         reply = await state.agent.handle(msg.text)
     except (OllamaUnavailableError, ClaudeUnavailableError) as exc:
+        logger.error("Chat request failed: %s", exc)
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception:
+        logger.exception("Chat request failed unexpectedly")
+        raise
+    logger.info("Chat request completed")
     return {"reply": reply}
+
+
+class HandoverRequest(BaseModel):
+    color: Literal["green", "black"]
+    duration_s: float | None = None
+
+
+@app.post("/skills/handover-pill")
+async def run_handover_pill(request: HandoverRequest) -> dict[str, Any]:
+    """Run the handover ACT skill directly, without asking the LLM to select a tool."""
+    arguments: dict[str, Any] = {"color": request.color}
+    if request.duration_s is not None:
+        arguments["duration_s"] = request.duration_s
+    logger.info("Direct handover started: color=%s", request.color)
+    try:
+        result = await state.run_handover(arguments)
+    except Exception as exc:
+        logger.exception("Direct handover failed: color=%s", request.color)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    logger.info("Direct handover completed: color=%s", request.color)
+    return result
 
 
 @app.websocket("/audit")

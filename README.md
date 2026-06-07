@@ -4,10 +4,14 @@ NurseArm connects an SO-101 robot arm to a browser interface and an LLM agent. T
 agent discovers a bounded set of MCP tools, selects a configured skill, executes it,
 and reports the structured result.
 
+See [HONESTY.md](HONESTY.md) for the project provenance, hackathon contributions,
+third-party foundations, AI assistance, functional status, mocks, and limitations.
+
 The current project supports:
 
 - Direct primitives: home, grip, release, and six Cartesian step directions
 - A trained ACT `sort_pills` policy through `lerobot-rollout`
+- An ACT `handover_pill` policy for green or black pill requests
 - Intel RealSense or V4L2 webcam streaming
 - MediaPipe hand openness and palm-up detection
 - Text and Faster-Whisper voice input
@@ -23,14 +27,19 @@ Requirements:
 
 - Python 3.12+
 - [`uv`](https://docs.astral.sh/uv/)
-- Ollama for the default local agent, or an Anthropic API key
+- [Ollama](https://ollama.com/) for the default local agent, or an Anthropic API key
 - LeRobot installed in the same environment for ACT policy execution
 - SO-101 and camera hardware for real operation
+
+Clone the repository, enter its root directory, and install the application:
 
 ```bash
 uv sync --extra dev
 cp .env.example .env
 ```
+
+NurseArm automatically reads `.env` from the repository root. Do not commit that
+file because it can contain API keys and local hardware paths.
 
 For the default local agent:
 
@@ -38,37 +47,110 @@ For the default local agent:
 ollama pull qwen3:4b
 ```
 
-## Run Without Hardware
+Alternatively, edit `.env` to use Claude:
 
-Mock mode keeps camera and robot operations local and prevents hardware access:
-
-```bash
-NURSEARM_MOCK=1 WHISPER_MODEL=base \
-  uv run uvicorn nursearm.interface.server:app --reload --host 127.0.0.1
+```dotenv
+AGENT_BACKEND=claude
+ANTHROPIC_API_KEY=your-real-key
 ```
 
-Open `http://127.0.0.1:8000`.
+### Start The UI And Server
+
+The FastAPI process serves the API, browser UI, camera streams, and LLM agent together.
+You do not need to start a separate frontend development server.
+
+For a complete local test without robot or camera hardware, set this in `.env`:
+
+```dotenv
+NURSEARM_MOCK=1
+AGENT_BACKEND=ollama
+WHISPER_MODEL=base
+```
+
+Then start the application from the repository root:
+
+```bash
+uv run nursearm-serve
+```
+
+Open `http://127.0.0.1:8000` in a browser. Verify startup from another terminal:
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+The response should contain `"ok": true` and `"mock": true`. The first startup can
+take longer while Faster-Whisper downloads the selected model.
 
 Mock mode is a development mode, not a simulated task-success mode. Primitive state is
 updated in memory, while `sort_pills` still fails clearly if no policy checkpoint is
-configured.
+configured. Stop the server with `Ctrl+C`.
 
 ## Run With Hardware
 
-Review [config/robot.yaml](config/robot.yaml) first. Its ports, robot IDs, cameras, FPS,
-and policy settings must match the calibration and training dataset.
-
-Set the trained checkpoint:
+Install camera support and LeRobot into the same `uv` environment:
 
 ```bash
-export NURSEARM_SORT_PILLS_POLICY=/absolute/path/to/pretrained_model
+uv sync --extra dev --extra robot
+uv pip install -e "/absolute/path/to/lerobot[core_scripts]"
+uv run lerobot-rollout --help
+```
+
+The `robot` extra installs Intel RealSense support. It is optional when every camera
+uses OpenCV/V4L2. LeRobot supplies the SO-101 runtime and policy deployment commands.
+
+On Linux, give your user permanent access to SO-101 serial devices:
+
+```bash
+sudo usermod -aG dialout "$USER"
+```
+
+Log out completely and log back in, then verify:
+
+```bash
+groups
+ls -l /dev/ttyACM0 /dev/ttyACM1
+test -r /dev/ttyACM1 && test -w /dev/ttyACM1 && echo "serial access OK"
+```
+
+`groups` must include `dialout`. For an immediate fix that lasts only until the device
+is unplugged or the machine restarts, use:
+
+```bash
+sudo setfacl -m "u:$USER:rw" /dev/ttyACM1
+```
+
+Before startup:
+
+1. Calibrate the follower arm with LeRobot and confirm its calibration file exists.
+2. Review [config/robot.yaml](config/robot.yaml). Set the follower serial port, robot
+   ID, camera definitions, FPS, policy device, and rollout duration.
+3. Make the serial and camera devices accessible to the current Linux user.
+4. Edit `.env` and set `NURSEARM_MOCK=0`, the camera source/indexes, agent backend,
+   and checkpoint paths.
+5. Confirm that each checkpoint's camera names, image sizes, FPS, task label, and
+   robot calibration match the training dataset.
+
+Example `.env` values:
+
+```dotenv
+NURSEARM_MOCK=0
+NURSEARM_CAMERA_SOURCE=webcam
+NURSEARM_WEBCAM_INDEX=8
+NURSEARM_CAMERA2_INDEX=2
+NURSEARM_SORT_PILLS_POLICY=/absolute/path/to/sort/pretrained_model
+NURSEARM_HANDOVER_PILLS_POLICY=/absolute/path/to/handover/pretrained_model
 ```
 
 Then start the server:
 
 ```bash
-NURSEARM_MOCK=0 uv run uvicorn nursearm.interface.server:app --host 127.0.0.1
+uv run nursearm-serve
 ```
+
+Open `http://127.0.0.1:8000` and check `http://127.0.0.1:8000/health` before moving
+the arm. `nursearm-serve` listens on port `8000`; the browser UI is part of this same
+server.
 
 The ACT rollout temporarily releases the in-process motor bus, runs
 `lerobot-rollout`, and reconnects after the subprocess exits.
@@ -88,7 +170,14 @@ Important environment variables:
 | `NURSEARM_CAMERA_SOURCE` | `realsense` | `realsense` or `webcam` |
 | `NURSEARM_WEBCAM_INDEX` | `0` | Primary V4L2 camera index |
 | `NURSEARM_CAMERA2_INDEX` | `2` | Secondary camera index |
+| `NURSEARM_LEROBOT_ROLLOUT` | `lerobot-rollout` | Rollout executable, optionally from a separate LeRobot environment |
 | `NURSEARM_SORT_PILLS_POLICY` | unset | ACT checkpoint directory |
+| `NURSEARM_HANDOVER_PILLS_POLICY` | unset | Shared handover checkpoint |
+| `NURSEARM_HANDOVER_GREEN_POLICY` | unset | Optional green-only checkpoint override |
+| `NURSEARM_HANDOVER_BLACK_POLICY` | unset | Optional black-only checkpoint override |
+| `NURSEARM_HANDOVER_TASK_TEMPLATE` | `Give the {color} pill to the hand` | Handover task label |
+| `NURSEARM_HANDOVER_CAMERA_ARG` | unset | Handover training camera config override |
+| `NURSEARM_HANDOVER_FPS` | unset | Handover training FPS override |
 | `WHISPER_MODEL` | `small` | Faster-Whisper model size |
 
 ## Skills
@@ -104,15 +193,101 @@ Enabled skills are defined in [config/skills.yaml](config/skills.yaml):
 | `move_forward`, `move_back` | primitive | Cartesian depth step through IK |
 | `move_left`, `move_right` | primitive | Cartesian lateral step through IK |
 | `sort_pills` | ACT policy | Sort green and black pills into matching cups |
+| `handover_pill` | ACT policy | Pick a requested green or black pill and present it to a hand |
 
 The MCP server exposes:
 
 - `list_skills`
 - `get_scene`
 - `run_skill`
+- `handover_pill`
 
 `get_scene` reports the implemented hand/palm fields only. Object, face, mouth, and
 gaze detection are not advertised because they are not implemented.
+
+### Connect The Handover Checkpoint
+
+Send the complete `pretrained_model` directory, not `training_state`:
+
+```bash
+tar -czf act_handover_pills_step35000.tar.gz \
+  -C outputs/train/act_handover_pills/checkpoints/035000 pretrained_model
+sha256sum act_handover_pills_step35000.tar.gz \
+  > act_handover_pills_step35000.tar.gz.sha256
+```
+
+The recipient should extract it to a stable absolute path:
+
+```bash
+mkdir -p ~/nursearm-models/act_handover_pills_step35000
+tar -xzf act_handover_pills_step35000.tar.gz \
+  -C ~/nursearm-models/act_handover_pills_step35000
+
+export NURSEARM_HANDOVER_PILLS_POLICY="$HOME/nursearm-models/act_handover_pills_step35000/pretrained_model"
+```
+
+The directory must contain at least:
+
+```text
+pretrained_model/
+├── config.json
+└── model.safetensors
+```
+
+Keep the processor and normalization files generated in the directory as well.
+
+Call it directly through MCP:
+
+```bash
+NURSEARM_MOCK=0 uv run nursearm-mcp-client \
+  --call handover_pill \
+  --arguments '{"color":"green"}'
+```
+
+Or ask the browser agent: `Hand me the black pill.` The LLM should select
+`handover_pill` and pass `{"color":"black"}`.
+
+The installed LeRobot version uses `lerobot-rollout` for policy deployment.
+`lerobot-record --policy.path=...` is not valid in this version because
+`lerobot-record` is teleoperation data collection only. Install LeRobot's core script
+dependencies in the same environment used to run NurseArm:
+
+```bash
+uv pip install -e "/absolute/path/to/lerobot[core_scripts]"
+```
+
+Verify before connecting the robot:
+
+```bash
+uv run lerobot-rollout --help
+```
+
+If this fails with `ModuleNotFoundError: draccus`, the LeRobot environment is
+incomplete.
+
+**ACT color selection:** standard ACT consumes robot state and images, not the MCP task
+text. A shared checkpoint can select green versus black only if your training pipeline
+actually conditioned the policy on that instruction. Otherwise train/export separate
+checkpoints and configure:
+
+```bash
+export NURSEARM_HANDOVER_GREEN_POLICY=/path/to/green/pretrained_model
+export NURSEARM_HANDOVER_BLACK_POLICY=/path/to/black/pretrained_model
+```
+
+Those color-specific variables take precedence over the shared path.
+
+If the handover dataset used different cameras or FPS from `config/robot.yaml`, set
+the exact training values:
+
+```bash
+export NURSEARM_HANDOVER_CAMERA_ARG='{...the exact LeRobot camera config...}'
+export NURSEARM_HANDOVER_FPS=15
+export NURSEARM_HANDOVER_TASK_TEMPLATE='Give the {color} pill to the hand'
+```
+
+Camera keys such as `wrist` and `front` must match the checkpoint's input feature
+names. Do not rename or omit a trained camera.
 
 ## ACT Data And Training
 
@@ -139,6 +314,9 @@ palm-normal heuristic.
 
 ## MCP
 
+The browser server automatically starts its own local MCP subprocess for the LLM
+agent. Do not start the standalone MCP server just to use the browser UI.
+
 List tools or call a skill without an LLM:
 
 ```bash
@@ -148,7 +326,8 @@ NURSEARM_MOCK=1 uv run nursearm-mcp-client \
   --arguments '{"name":"move_up","args":{"step_m":0.02}}'
 ```
 
-Run the standalone HTTP MCP server:
+Run the standalone HTTP MCP server only when an external MCP client needs to connect
+directly:
 
 ```bash
 NURSEARM_MOCK=1 uv run nursearm-mcp --transport streamable-http
@@ -166,7 +345,9 @@ docker compose up --build openclaw
 ```
 
 The container receives Telegram messages and forwards supported requests to `/chat`
-through one MCP bridge tool.
+through one MCP bridge tool. It also sends a heartbeat every 3 seconds; the UI marks
+the OpenClaw bot offline after roughly 8-9 seconds without a heartbeat. Rebuild the
+container after updating the bot files so this status signal is included.
 
 ## Tests
 
@@ -200,6 +381,8 @@ NURSEARM_MOCK=1 uv run python scripts/test_mcp.py
   verification.
 - `sort_pills` runs the policy but reports `success=false` until visual outcome
   verification is implemented.
+- `handover_pill` also reports `success=false` after rollout until handover verification
+  is implemented.
 - Torque is disabled after primitive motion, including gripper commands.
 
 Operate the physical arm only in a controlled workspace with an accessible emergency

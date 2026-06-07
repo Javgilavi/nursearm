@@ -1,8 +1,8 @@
 # SO-101 + camera configuration. Fill in after calibration (scripts/calibrate.py).
 
 # Serial ports (find with `lerobot-find-port`, one arm at a time)
-follower_port: /dev/ttyACM1
-leader_port: /dev/ttyACM0
+follower_port: /dev/ttyACM0
+leader_port: /dev/ttyACM1
 
 # Calibration ids (set during `lerobot-calibrate ... --robot.id=...`) — reuse everywhere.
 # MUST match the id used when recording/calibrating, so the right calibration loads.
@@ -19,7 +19,7 @@ camera_arg: "{wrist: {type: opencv, index_or_path: /dev/v4l/by-id/usb-HBV_HD_CAM
 # Policy rollout settings (must match training).
 fps: 15                              # control rate; = dataset fps
 policy_device: cuda                  # cuda | cpu | mps
-policy_temporal_ensemble_coeff: 0.01 # ACT smoothing (avoids the jerky chunk boundaries)
+policy_temporal_ensemble_coeff: null # Keep null when the checkpoint uses n_action_steps > 1
 rollout_duration_s: 30              # seconds per run_policy call
 
 # Hand-eye transform: 4x4 matrix mapping CAMERA frame -> ROBOT BASE frame.

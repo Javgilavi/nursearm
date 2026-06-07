@@ -47,6 +47,17 @@
               <strong>Synced <em lang="zh-HK">同步</em></strong>
               <span>Live stream · <span lang="zh-HK">直播已啟動</span></span>
             </article>
+            <div
+              id="openclaw-status"
+              class="bot-status-bubble bot-status-offline"
+              role="status"
+              aria-live="polite"
+              title="No recent heartbeat from the OpenClaw container"
+            >
+              <span class="bot-status-dot" aria-hidden="true"></span>
+              <span>OpenClaw bot</span>
+              <strong id="openclaw-status-label">Offline</strong>
+            </div>
           </section>
 
           <!-- 3D Digital Twin — big on desktop, shown in status tab on mobile -->
@@ -131,6 +142,15 @@
             <p class="hk-credit">香港 · Hong Kong</p>
           </div>
         </aside>
+
+        <div
+          class="splitter splitter-rail"
+          id="rail-splitter"
+          role="separator"
+          aria-label="Resize status sidebar"
+          aria-orientation="vertical"
+          tabindex="0"
+        ></div>
 
         <main class="layout" id="layout">
           <section class="camera-column" id="camera-column">
@@ -222,8 +242,8 @@
 
             <div class="quick-actions" aria-label="Suggested prompts">
               <button type="button" class="prompt-chip" data-prompt="Sort the pills into their matching cups.">Sort pills</button>
-              <button type="button" class="prompt-chip" data-prompt="Check whether an open palm is visible.">Palm check</button>
-              <button type="button" class="prompt-chip" data-prompt="Move the robot to its home position.">Home arm</button>
+              <button type="button" class="prompt-chip act-skill-chip" data-handover-color="green">Green pill</button>
+              <button type="button" class="prompt-chip act-skill-chip" data-handover-color="black">Black pill</button>
             </div>
 
             <div id="chat-messages" class="chat-messages" aria-live="polite" aria-relevant="additions"></div>

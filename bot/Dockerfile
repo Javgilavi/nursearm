@@ -16,6 +16,7 @@ RUN npm install -g openclaw@latest
 
 # Copy MCP bridge and workspace files
 COPY mcp_bridge.py .
+COPY heartbeat.py .
 COPY workspace/ /app/workspace/
 
 # Entrypoint generates openclaw.json from env vars and starts the gateway

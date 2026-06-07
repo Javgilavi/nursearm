@@ -15,6 +15,10 @@ The active tool boundary is:
 - `list_skills`: inspect enabled capabilities
 - `get_scene`: read implemented hand/palm state
 - `run_skill`: execute a named primitive or ACT skill
+- `handover_pill`: execute the pill-handover policy for `green` or `black`
+
+For `handover_pill`, the agent must pass exactly one supported color:
+`{"color":"green"}` or `{"color":"black"}`.
 
 The agent must not claim success unless the returned `SkillResult.success` is true.
 The LLM does not receive raw motor access and does not run the real-time control loop.

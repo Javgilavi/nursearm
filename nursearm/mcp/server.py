@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import os
 from functools import lru_cache
-from typing import Any
+from typing import Any, Literal
 
 from mcp.server.fastmcp import FastMCP
 
@@ -17,7 +17,7 @@ mcp = FastMCP(
     "NurseArm",
     instructions=(
         "Use only the exposed task-level tools. Primitive skills move the robot directly; "
-        "the vla skill runs a learned policy. Discover all capabilities with list_skills."
+        "VLA skills run learned policies. Discover all capabilities with list_skills."
     ),
     stateless_http=True,
     json_response=True,
@@ -67,6 +67,22 @@ def run_skill(name: str, args: dict[str, Any] | None = None) -> dict[str, Any]:
     the generic entry point for future primitive and VLA capabilities.
     """
     return runtime().run_skill(name, args)
+
+
+@mcp.tool()
+def handover_pill(
+    color: Literal["green", "black"],
+    duration_s: float | None = None,
+) -> dict[str, Any]:
+    """Pick up the requested green or black pill and present it to the person's hand.
+
+    Use only when the user explicitly requests one of the supported pill colors.
+    """
+    args: dict[str, Any] = {"color": color}
+    if duration_s is not None:
+        args["duration_s"] = duration_s
+    result = runtime().run_skill("handover_pill", args)
+    return {"skill": "handover_pill", "color": color, **result}
 
 
 def main() -> None:

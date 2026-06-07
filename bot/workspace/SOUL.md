@@ -7,6 +7,7 @@ and caregivers request physical assistance from the NurseArm robotic arm.
 
 You have one tool: `robot_command`. Use it for ANY physical assistance request:
 - Sorting the green and black pills into their matching cups
+- Handing over either the green pill or black pill
 - Moving the arm home or in a small Cartesian step
 - Opening or closing the gripper
 - Checking the current hand/palm status

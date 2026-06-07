@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from typing import Any
 
 import anthropic
@@ -14,6 +15,7 @@ from nursearm.orchestrator.ollama_agent import SYSTEM_PROMPT
 
 DEFAULT_MODEL = "claude-sonnet-4-6"
 MAX_TURNS = 12
+logger = logging.getLogger(__name__)
 
 
 class ClaudeUnavailableError(RuntimeError):
@@ -44,6 +46,7 @@ class ClaudeMCPAgent:
             return await self._handle_locked(user_intent)
 
     async def _handle_locked(self, user_intent: str) -> str:
+        logger.info("Claude agent handling request with model %s", self.model)
         self._log({"event": "user_intent", "text": user_intent})
         self._history.append({"role": "user", "content": user_intent})
 
@@ -58,6 +61,7 @@ class ClaudeMCPAgent:
         ]
 
         for _ in range(MAX_TURNS):
+            logger.info("Waiting for Claude response")
             try:
                 response = await self._client.messages.create(
                     model=self.model,
@@ -83,6 +87,7 @@ class ClaudeMCPAgent:
                         continue
                     name = block.name
                     args = block.input or {}
+                    logger.info("Claude selected MCP tool %s", name)
                     self._log({"event": "mcp_tool", "tool": name, "args": args})
                     try:
                         result = await self.mcp.call_tool(name, args)
@@ -101,6 +106,7 @@ class ClaudeMCPAgent:
             reply = " ".join(
                 block.text for block in response.content if hasattr(block, "text")
             ).strip()
+            logger.info("Claude returned final response")
             self._log({"event": "report", "text": reply})
             self._trim_history()
             return reply or "No reply from Claude."

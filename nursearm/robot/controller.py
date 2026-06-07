@@ -7,6 +7,7 @@ In mock mode all operations are no-ops that log to stdout.
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
 import time
 
@@ -38,8 +39,9 @@ class RobotController:
         # Policy rollout settings (must match how the policy was trained).
         self.fps = rc.get("fps", 15)
         self.policy_device = rc.get("policy_device", "cuda")
-        self.temporal_ensemble_coeff = rc.get("policy_temporal_ensemble_coeff", 0.01)
+        self.temporal_ensemble_coeff = rc.get("policy_temporal_ensemble_coeff")
         self.rollout_duration_s = rc.get("rollout_duration_s", 30)
+        self.rollout_executable = os.getenv("NURSEARM_LEROBOT_ROLLOUT", "lerobot-rollout")
         self._bus = None
         self._current_pose: dict[str, float] = dict(_HOME_POSE)
         if not mock:
@@ -55,8 +57,21 @@ class RobotController:
             bus.connect()
             self._bus = bus
             logger.info("SO-101 follower connected on %s.", self.port)
-        except Exception:
-            logger.exception("Could not connect SO-101 on %s — running in degraded mode.", self.port)
+        except Exception as exc:
+            permission_denied = (
+                isinstance(exc, PermissionError)
+                or getattr(exc, "errno", None) == 13
+                or "Permission denied" in str(exc)
+            )
+            if permission_denied:
+                logger.error(
+                    "Permission denied opening %s. Add the current user to the device group "
+                    "(usually `sudo usermod -aG dialout $USER`), then log out and back in.",
+                    self.port,
+                    exc_info=True,
+                )
+            else:
+                logger.exception("Could not connect SO-101 on %s — running in degraded mode.", self.port)
 
     # ── state reading ─────────────────────────────────────────────────────────
 
@@ -168,14 +183,18 @@ class RobotController:
         policy_path: str | None,
         task: str,
         duration_s: float | None = None,
+        camera_arg: str | None = None,
+        fps: float | None = None,
     ) -> None:
         """Run a full trained-skill rollout (Option B: lerobot-rollout subprocess).
 
         Frees the in-process serial connection first so lerobot-rollout can own the arm,
-        then reconnects afterwards. Passes the ACT smoothing flag (temporal ensembling)
-        and the camera/fps config that must match how the policy was trained.
+        then reconnects afterwards. Passes the camera/fps config and only enables
+        temporal ensembling when explicitly configured for a compatible checkpoint.
         """
         duration_s = self.rollout_duration_s if duration_s is None else duration_s
+        camera_arg = self.camera_arg if camera_arg is None else camera_arg
+        fps = self.fps if fps is None else fps
         if self.mock or not policy_path:
             logger.info("[mock] run_policy(%s, task=%r)", policy_path, task)
             return
@@ -191,17 +210,21 @@ class RobotController:
             self._bus = None
 
         cmd = [
-            "lerobot-rollout", "--strategy.type=base",
+            self.rollout_executable, "--strategy.type=base",
             f"--policy.path={policy_path}",
             f"--policy.device={self.policy_device}",
-            f"--policy.temporal_ensemble_coeff={self.temporal_ensemble_coeff}",
             "--robot.type=so101_follower",
             f"--robot.port={self.port}", f"--robot.id={self.robot_id}",
-            f"--robot.cameras={self.camera_arg}",
+            f"--robot.cameras={camera_arg}",
             f"--task={task}",
-            f"--fps={self.fps}",
+            f"--fps={fps}",
             f"--duration={duration_s}",
         ]
+        if self.temporal_ensemble_coeff is not None:
+            cmd.insert(
+                4,
+                f"--policy.temporal_ensemble_coeff={self.temporal_ensemble_coeff}",
+            )
         logger.info("Running: %s", " ".join(cmd))
         try:
             subprocess.run(cmd, check=True)  # noqa: S603

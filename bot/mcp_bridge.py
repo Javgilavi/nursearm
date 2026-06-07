@@ -18,11 +18,13 @@ NURSEARM_URL = os.getenv("NURSEARM_URL", "http://host.docker.internal:8000")
 async def robot_command(command: str) -> str:
     """Send a natural-language command to the NurseArm robot assistant.
 
-    Use this for supported robot requests: sorting pills, primitive arm movement,
-    gripper control, hand/palm observation, and status checks.
+    Use this for supported robot requests: sorting pills, handing over the green or
+    black pill, primitive arm movement, gripper control, hand/palm observation, and
+    status checks.
 
     Examples:
       command="sort the pills into their matching cups"
+      command="hand me the green pill"
       command="move the arm up"
       command="open the gripper"
       command="is there an open palm in view?"

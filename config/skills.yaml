@@ -86,3 +86,14 @@ skills:
     task: "Sort two mock pills, green to green cup and black to black cup"
     policy_env: NURSEARM_SORT_PILLS_POLICY
     enabled: true
+
+  handover_pill:
+    type: vla
+    class: nursearm.skills.handover_pill.HandoverPill
+    description: >
+      Pick up one pill and present it to the person's hand using the trained ACT
+      handover policy. The requested color is required and must be green or black.
+      Args: {color: "green" | "black", duration_s: <optional seconds>}.
+    task: "Give the {color} pill to the hand"
+    policy_env: NURSEARM_HANDOVER_PILLS_POLICY
+    enabled: true
