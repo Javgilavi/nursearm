@@ -628,7 +628,7 @@ mobileTabBtns.forEach((btn) => {
     });
     btn.classList.add("active");
     btn.setAttribute("aria-pressed", "true");
-    document.body.classList.remove("mobile-tab-camera", "mobile-tab-status");
+    document.body.classList.remove("mobile-tab-camera", "mobile-tab-status", "mobile-tab-schedule");
     if (tab !== "chat") {
       document.body.classList.add(`mobile-tab-${tab}`);
     }
@@ -657,6 +657,255 @@ async function pollPalmStatus() {
     palmBadge.textContent = "";
   }
 }
+
+// ── Medication schedule ─────────────────────────────────────────────────────────
+
+const medConn = document.getElementById("med-conn");
+const medConnLabel = document.getElementById("med-conn-label");
+const medAutoToggle = document.getElementById("med-autopilot-toggle");
+const medConnect = document.getElementById("med-connect");
+const medList = document.getElementById("med-list");
+const medEmpty = document.getElementById("med-empty");
+const medAddForm = document.getElementById("med-add-form");
+const medAddTime = document.getElementById("med-add-time");
+const medAddTrigger = document.getElementById("med-add-trigger");
+const medAddDaily = document.getElementById("med-add-daily");
+const medAddBtn = document.getElementById("med-add-btn");
+const medAddError = document.getElementById("med-add-error");
+
+const medBanner = document.getElementById("med-banner");
+const medBannerDot = document.getElementById("med-banner-dot");
+const medBannerTitle = document.getElementById("med-banner-title");
+const medBannerSub = document.getElementById("med-banner-sub");
+const medBannerRun = document.getElementById("med-banner-run");
+const medBannerSkip = document.getElementById("med-banner-skip");
+
+const STATUS_CHIP = {
+  scheduled: "Upcoming",
+  due: "Due now",
+  done: "Given",
+  skipped: "Skipped",
+  missed: "Missed",
+};
+
+let medAutoPilot = true;
+let medConnected = false;       // writes (add/cancel) are possible
+let medPending = null;          // last-known pending firing, for the banner countdown
+let medServerOffset = 0;        // serverClock - clientClock, in ms
+let medTriggerSig = "";         // signature of the trigger <select> options
+let medBusy = false;            // suppress polling clobber during an action
+
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
+function renderTriggerOptions(triggers) {
+  const sig = triggers.map((t) => `${t.key}:${t.label}`).join("|");
+  if (sig === medTriggerSig) return;
+  medTriggerSig = sig;
+  const previous = medAddTrigger.value;
+  medAddTrigger.innerHTML = triggers
+    .map((t) => `<option value="${t.key}">${t.label}</option>`)
+    .join("");
+  if (triggers.some((t) => t.key === previous)) medAddTrigger.value = previous;
+}
+
+function renderConnection(connection) {
+  const backend = connection?.backend;
+  const ready = connection?.configured && connection?.authorized;
+  medConn.classList.remove("med-conn-unknown", "med-conn-demo", "med-conn-online", "med-conn-offline");
+  if (backend === "fake") {
+    medConn.classList.add("med-conn-demo");
+    medConnLabel.textContent = "Demo";
+    medConnect.hidden = true;
+    medConnected = true;
+  } else if (ready) {
+    medConn.classList.add("med-conn-online");
+    medConnLabel.textContent = "Connected";
+    medConnect.hidden = true;
+    medConnected = true;
+  } else {
+    medConn.classList.add("med-conn-offline");
+    medConnLabel.textContent = "Offline";
+    medConnect.hidden = false;
+    medConnected = false;
+  }
+  medAddBtn.disabled = !medConnected;
+  medAddTime.disabled = !medConnected;
+  medAddTrigger.disabled = !medConnected;
+}
+
+function renderAutoPilot(enabled) {
+  medAutoPilot = enabled;
+  medAutoToggle.setAttribute("aria-checked", enabled ? "true" : "false");
+}
+
+function eventActions(ev) {
+  if (ev.status === "due") {
+    return (
+      `<button type="button" class="med-mini-btn med-mini-run" data-fire="${ev.id}">Give</button>` +
+      `<button type="button" class="med-mini-btn" data-skip="${ev.id}">Skip</button>`
+    );
+  }
+  return `<button type="button" class="med-mini-btn med-mini-del" data-del="${ev.id}" aria-label="Remove">×</button>`;
+}
+
+function renderEvents(events) {
+  if (!events.length) {
+    medList.innerHTML = "";
+    medEmpty.hidden = false;
+    return;
+  }
+  medEmpty.hidden = true;
+  medList.innerHTML = events
+    .map((ev) => {
+      const chip = STATUS_CHIP[ev.status] || ev.status;
+      return (
+        `<li class="med-item is-${ev.status}">` +
+        `<span class="med-item-dot" style="background:${ev.color_hex}"></span>` +
+        `<span class="med-item-time">${ev.start_human}</span>` +
+        `<span class="med-item-label">${ev.label}</span>` +
+        `<span class="med-item-chip">${chip}</span>` +
+        `<span class="med-item-actions">${eventActions(ev)}</span>` +
+        `</li>`
+      );
+    })
+    .join("");
+}
+
+function tickBanner() {
+  if (!medPending) {
+    medBanner.hidden = true;
+    return;
+  }
+  medBanner.hidden = false;
+  medBannerDot.style.background = medPending.color_hex || "var(--accent)";
+
+  if (medPending.firing) {
+    medBannerTitle.textContent = `Giving ${medPending.label}…`;
+    medBannerSub.textContent = "The robot is handing over the pill.";
+    medBannerRun.hidden = true;
+    medBannerSkip.hidden = true;
+    return;
+  }
+
+  medBannerRun.hidden = false;
+  medBannerSkip.hidden = false;
+  medBannerTitle.textContent = `${medPending.label} due`;
+
+  if (medPending.fires_at) {
+    const serverNow = Date.now() + medServerOffset;
+    const remaining = Math.max(0, Math.ceil((Date.parse(medPending.fires_at) - serverNow) / 1000));
+    medBannerSub.textContent =
+      remaining > 0 ? `Giving automatically in ${remaining}s — cancel?` : "Giving now…";
+  } else {
+    medBannerSub.textContent = "Auto-pilot is off — give now or skip.";
+  }
+}
+
+function renderSchedule(payload) {
+  if (payload.server_time) {
+    medServerOffset = Date.parse(payload.server_time) - Date.now();
+  }
+  renderConnection(payload.connection);
+  renderAutoPilot(payload.auto_pilot);
+  renderTriggerOptions(payload.triggers || []);
+  renderEvents(payload.events || []);
+  medPending = payload.pending || null;
+  tickBanner();
+}
+
+async function pollSchedule() {
+  if (medBusy) return;
+  try {
+    const r = await fetch("/calendar/schedule");
+    if (!r.ok) return;
+    renderSchedule(await r.json());
+  } catch { /* network error — keep last-known schedule */ }
+}
+
+async function medAction(url, method = "POST") {
+  medBusy = true;
+  try {
+    await fetch(url, { method });
+  } catch { /* surfaced on next poll */ } finally {
+    medBusy = false;
+  }
+  await pollSchedule();
+}
+
+medAutoToggle.addEventListener("click", async () => {
+  const next = !medAutoPilot;
+  renderAutoPilot(next);  // optimistic
+  medBusy = true;
+  try {
+    await fetch("/calendar/auto-pilot", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled: next }),
+    });
+  } catch { /* reverts on next poll */ } finally {
+    medBusy = false;
+  }
+  await pollSchedule();
+});
+
+medList.addEventListener("click", (event) => {
+  const target = event.target.closest("button");
+  if (!target) return;
+  if (target.dataset.fire) medAction(`/calendar/fire/${target.dataset.fire}`);
+  else if (target.dataset.skip) medAction(`/calendar/skip/${target.dataset.skip}`);
+  else if (target.dataset.del) medAction(`/calendar/events/${target.dataset.del}`, "DELETE");
+});
+
+medBannerRun.addEventListener("click", () => {
+  if (medPending) medAction(`/calendar/fire/${medPending.event_id}`);
+});
+
+medBannerSkip.addEventListener("click", () => {
+  if (medPending) medAction(`/calendar/skip/${medPending.event_id}`);
+});
+
+medAddForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  medAddError.hidden = true;
+  const time = medAddTime.value;
+  const trigger = medAddTrigger.value;
+  if (!time || !trigger) return;
+
+  const [h, m] = time.split(":").map(Number);
+  const when = new Date();
+  when.setHours(h, m, 0, 0);
+  if (when.getTime() <= Date.now()) when.setDate(when.getDate() + 1);
+  const startIso =
+    `${when.getFullYear()}-${pad2(when.getMonth() + 1)}-${pad2(when.getDate())}` +
+    `T${pad2(when.getHours())}:${pad2(when.getMinutes())}:00`;
+
+  medAddBtn.disabled = true;
+  medBusy = true;
+  try {
+    const r = await fetch("/calendar/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ trigger, start_iso: startIso, daily: medAddDaily.checked }),
+    });
+    const payload = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      medAddError.textContent = payload.detail || "Could not add the pill.";
+      medAddError.hidden = false;
+    } else {
+      medAddTime.value = "";
+      medAddDaily.checked = false;
+    }
+  } catch {
+    medAddError.textContent = "Cannot reach the NurseArm backend.";
+    medAddError.hidden = false;
+  } finally {
+    medBusy = false;
+    medAddBtn.disabled = !medConnected;
+  }
+  await pollSchedule();
+});
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 
@@ -702,7 +951,10 @@ window.addEventListener("load", () => {
   }
   pollHealth();
   pollPalmStatus();
+  pollSchedule();
   setInterval(pollHealth, 1000);
   setInterval(pollPalmStatus, 1000);
   setInterval(pollRobotState, 1000 / POLL_HZ);
+  setInterval(pollSchedule, 3000);
+  setInterval(tickBanner, 1000);  // smooth banner countdown between polls
 });

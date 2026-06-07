@@ -300,6 +300,485 @@ h1 {
   animation: status-pulse-glow 2s ease-in-out infinite;
 }
 
+/* ── Today's medication card ─────────────────────────────────────────────────── */
+
+.med-card {
+  border: 1px solid var(--line);
+  background: var(--surface-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 15px 15px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.med-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.med-title {
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+  margin-top: 2px;
+}
+
+.med-conn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--muted);
+}
+
+.med-conn-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #8f867a;
+  flex-shrink: 0;
+}
+
+.med-conn-online {
+  color: var(--safe);
+  background: rgba(46, 122, 98, 0.10);
+  border-color: rgba(46, 122, 98, 0.22);
+}
+
+.med-conn-online .med-conn-dot {
+  background: var(--safe);
+  box-shadow: 0 0 0 3px rgba(46, 122, 98, 0.18);
+  animation: status-pulse-glow 2s ease-in-out infinite;
+}
+
+.med-conn-demo {
+  color: var(--gold);
+  background: rgba(184, 134, 11, 0.10);
+  border-color: rgba(184, 134, 11, 0.22);
+}
+
+.med-conn-demo .med-conn-dot {
+  background: var(--gold);
+  box-shadow: 0 0 0 3px rgba(184, 134, 11, 0.18);
+}
+
+.med-conn-offline {
+  color: var(--accent-deep);
+  background: var(--accent-soft);
+  border-color: rgba(193, 39, 45, 0.20);
+}
+
+.med-conn-offline .med-conn-dot { background: var(--accent); }
+
+/* Auto-pilot toggle */
+
+.med-autopilot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: rgba(46, 122, 98, 0.06);
+  border: 1px solid rgba(46, 122, 98, 0.16);
+}
+
+.med-autopilot-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.med-autopilot-text strong {
+  font-size: 0.9rem;
+  letter-spacing: -0.01em;
+}
+
+.med-autopilot-text span {
+  font-size: 0.74rem;
+  color: var(--muted);
+  line-height: 1.3;
+}
+
+.med-switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 44px;
+  height: 26px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(28, 18, 8, 0.18);
+  transition: background 200ms ease;
+  padding: 0;
+}
+
+.med-switch-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 5px rgba(28, 18, 8, 0.28);
+  transition: transform 200ms ease;
+}
+
+.med-switch[aria-checked="true"] {
+  background: var(--safe);
+}
+
+.med-switch[aria-checked="true"] .med-switch-thumb {
+  transform: translateX(18px);
+}
+
+.med-switch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Not-connected note */
+
+.med-connect {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  border: 1px solid rgba(193, 39, 45, 0.18);
+  font-size: 0.76rem;
+  color: var(--muted-strong);
+}
+
+.med-connect strong {
+  font-size: 0.84rem;
+  color: var(--accent-deep);
+}
+
+.med-connect code {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.72rem;
+  background: rgba(28, 18, 8, 0.06);
+  padding: 1px 5px;
+  border-radius: 5px;
+}
+
+/* Event timeline */
+
+.med-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.med-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.46);
+}
+
+.med-item-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px rgba(28, 18, 8, 0.05);
+}
+
+.med-item-time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 0.86rem;
+  letter-spacing: -0.01em;
+  flex-shrink: 0;
+}
+
+.med-item-label {
+  font-size: 0.84rem;
+  color: var(--muted-strong);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.med-item-chip {
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  background: rgba(28, 18, 8, 0.06);
+  color: var(--muted);
+}
+
+.med-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.med-mini-btn {
+  border: 1px solid var(--line-strong);
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  padding: 4px 10px;
+  color: var(--muted-strong);
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.med-mini-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.med-mini-run {
+  background: var(--safe);
+  border-color: var(--safe);
+  color: #fff;
+}
+
+.med-mini-run:hover {
+  background: #266b55;
+  border-color: #266b55;
+  color: #fff;
+}
+
+.med-mini-del {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+/* Per-status accents */
+
+.med-item.is-due {
+  border-color: rgba(193, 39, 45, 0.28);
+  background: var(--accent-soft);
+}
+
+.med-item.is-due .med-item-chip {
+  background: var(--accent);
+  color: #fff;
+}
+
+.med-item.is-done { opacity: 0.62; }
+.med-item.is-done .med-item-chip { background: rgba(46, 122, 98, 0.16); color: var(--safe); }
+
+.med-item.is-skipped,
+.med-item.is-missed { opacity: 0.62; }
+
+.med-item.is-skipped .med-item-time,
+.med-item.is-skipped .med-item-label,
+.med-item.is-missed .med-item-time,
+.med-item.is-missed .med-item-label {
+  text-decoration: line-through;
+}
+
+.med-item.is-missed .med-item-chip { background: rgba(139, 105, 20, 0.16); color: var(--warning); }
+
+.med-empty {
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-align: center;
+  padding: 8px 0;
+}
+
+/* Add-pill form */
+
+.med-add {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 11px;
+  border-top: 1px solid var(--line);
+}
+
+.med-add-row {
+  display: flex;
+  gap: 8px;
+}
+
+.med-add-time,
+.med-add-trigger {
+  border: 1px solid var(--line-strong);
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 0.84rem;
+  color: var(--ink);
+  min-width: 0;
+}
+
+.med-add-time { flex: 0 0 auto; }
+.med-add-trigger { flex: 1; }
+
+.med-add-time:focus,
+.med-add-trigger:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.med-add-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.med-daily {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--muted-strong);
+  cursor: pointer;
+}
+
+.med-daily input { accent-color: var(--safe); }
+
+.med-add-btn {
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.01em;
+  padding: 8px 16px;
+  box-shadow: 0 4px 14px rgba(193, 39, 45, 0.26);
+  transition: background 160ms ease, transform 120ms ease;
+}
+
+.med-add-btn:hover:not(:disabled) { background: var(--accent-deep); }
+.med-add-btn:active:not(:disabled) { transform: translateY(1px); }
+.med-add-btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+
+.med-add-error {
+  font-size: 0.74rem;
+  color: var(--accent-deep);
+  margin: 0;
+}
+
+.med-add-error[hidden] { display: none; }
+
+/* ── Due-pill banner (global, top of screen) ─────────────────────────────────── */
+
+@keyframes med-banner-in {
+  from { transform: translate(-50%, -16px); opacity: 0; }
+  to   { transform: translate(-50%, 0); opacity: 1; }
+}
+
+.med-banner {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 12px 14px 12px 16px;
+  border-radius: 999px;
+  background: var(--surface-strong);
+  border: 1px solid rgba(193, 39, 45, 0.24);
+  box-shadow: 0 18px 50px rgba(28, 18, 8, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(22px) saturate(1.3);
+  -webkit-backdrop-filter: blur(22px) saturate(1.3);
+  animation: med-banner-in 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.med-banner[hidden] { display: none; }
+
+.med-banner-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+  animation: status-pulse-glow 1.4s ease-in-out infinite;
+}
+
+.med-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.med-banner-text strong {
+  font-size: 0.92rem;
+  letter-spacing: -0.01em;
+}
+
+.med-banner-sub {
+  font-size: 0.76rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.med-banner-btn {
+  border: 0;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.8rem;
+  padding: 8px 16px;
+  flex-shrink: 0;
+  transition: background 160ms ease, color 160ms ease, transform 120ms ease;
+}
+
+.med-banner-btn:active { transform: translateY(1px); }
+
+.med-banner-run {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(193, 39, 45, 0.3);
+}
+
+.med-banner-run:hover { background: var(--accent-deep); }
+
+.med-banner-skip {
+  background: rgba(28, 18, 8, 0.06);
+  color: var(--muted-strong);
+}
+
+.med-banner-skip:hover { background: rgba(28, 18, 8, 0.12); }
+
 .rail-remote {
   padding: 4px 0;
 }
@@ -1207,6 +1686,19 @@ body.is-resizing-horizontal * {
 
   body.mobile-tab-status #layout { display: none; }
   body.mobile-tab-status .rail   { display: flex; }
+  /* Medication lives in its own Schedule tab on phones. */
+  body.mobile-tab-status #med-card { display: none; }
+
+  /* ── Schedule tab — rail showing only the medication card ── */
+
+  body.mobile-tab-schedule #layout { display: none; }
+  body.mobile-tab-schedule .rail   { display: flex; padding-top: 20px; }
+  body.mobile-tab-schedule .rail > *:not(#med-card) { display: none; }
+
+  body.mobile-tab-schedule .med-card {
+    box-shadow: none;
+    background: var(--surface-strong);
+  }
 
   /* ── Floating pill tab bar ── */
 
@@ -1240,7 +1732,7 @@ body.is-resizing-horizontal * {
     gap: 7px;
     border: 0;
     border-radius: 999px;
-    padding: 11px 18px;
+    padding: 11px 14px;
     background: transparent;
     color: var(--muted-strong);
     font-size: 0.8rem;
@@ -1265,12 +1757,17 @@ body.is-resizing-horizontal * {
     transition: stroke-width 220ms ease;
   }
 
+  /* With four tabs, keep the bar compact: only the active tab shows its label. */
+  .mobile-tab-btn span { display: none; }
+
   .mobile-tab-btn.active {
     background: var(--accent);
     color: #fff;
     box-shadow: 0 4px 16px rgba(193, 39, 45, 0.38);
-    padding: 11px 22px;
+    padding: 11px 20px;
   }
+
+  .mobile-tab-btn.active span { display: inline; }
 
   .mobile-tab-btn.active svg {
     stroke-width: 2.4;

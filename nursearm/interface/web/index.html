@@ -7,6 +7,17 @@
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
+    <!-- Global due-event banner — appears when a scheduled pill is due -->
+    <div id="med-banner" class="med-banner" role="alert" aria-live="assertive" hidden>
+      <span id="med-banner-dot" class="med-banner-dot" aria-hidden="true"></span>
+      <div class="med-banner-text">
+        <strong id="med-banner-title">Pill due</strong>
+        <span id="med-banner-sub"></span>
+      </div>
+      <button type="button" id="med-banner-run" class="med-banner-btn med-banner-run">Run now</button>
+      <button type="button" id="med-banner-skip" class="med-banner-btn med-banner-skip">Skip</button>
+    </div>
+
     <div class="app-shell">
       <div class="workspace">
         <aside class="rail" aria-label="System summary">
@@ -29,6 +40,66 @@
             <p class="zh-title" lang="zh-HK">護士臂臨床控制台</p>
             <p class="subtitle">Low-noise control surface for bedside assistance.</p>
           </div>
+
+          <!-- Today's medication — calendar-driven pill schedule -->
+          <section id="med-card" class="med-card" aria-label="Today's medication">
+            <div class="med-head">
+              <div class="med-head-text">
+                <p class="panel-kicker">Medication · <span lang="zh-HK">用藥</span></p>
+                <h2 class="med-title">Today's schedule</h2>
+              </div>
+              <span id="med-conn" class="med-conn med-conn-unknown" title="Calendar connection">
+                <span class="med-conn-dot" aria-hidden="true"></span>
+                <span id="med-conn-label">Checking…</span>
+              </span>
+            </div>
+
+            <div class="med-autopilot">
+              <span class="med-autopilot-text">
+                <strong>Auto-pilot</strong>
+                <span>Give pills automatically at their time</span>
+              </span>
+              <button
+                type="button"
+                id="med-autopilot-toggle"
+                class="med-switch"
+                role="switch"
+                aria-checked="true"
+                aria-label="Toggle medication auto-pilot"
+              >
+                <span class="med-switch-thumb" aria-hidden="true"></span>
+              </button>
+            </div>
+
+            <div id="med-connect" class="med-connect" hidden>
+              <strong>Calendar not connected</strong>
+              <span>Run <code>uv run nursearm-calendar-auth</code>, then restart the server.</span>
+            </div>
+
+            <ul id="med-list" class="med-list" aria-live="polite"></ul>
+            <p id="med-empty" class="med-empty" hidden>No pills scheduled for today.</p>
+
+            <form id="med-add-form" class="med-add" aria-label="Schedule a pill">
+              <div class="med-add-row">
+                <input
+                  type="time"
+                  id="med-add-time"
+                  class="med-add-time"
+                  required
+                  aria-label="Time"
+                />
+                <select id="med-add-trigger" class="med-add-trigger" aria-label="Pill"></select>
+              </div>
+              <div class="med-add-foot">
+                <label class="med-daily">
+                  <input type="checkbox" id="med-add-daily" />
+                  <span>Repeat daily</span>
+                </label>
+                <button type="submit" id="med-add-btn" class="med-add-btn">Add pill</button>
+              </div>
+              <p id="med-add-error" class="med-add-error" role="alert" hidden></p>
+            </form>
+          </section>
 
           <section class="rail-stack">
             <article class="rail-card status-card status-online">
@@ -281,6 +352,13 @@
           <circle cx="12" cy="13" r="4"/>
         </svg>
         <span>Camera</span>
+      </button>
+      <button class="mobile-tab-btn" data-tab="schedule" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="18" rx="2"/>
+          <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+        <span>Schedule</span>
       </button>
       <button class="mobile-tab-btn" data-tab="status" aria-pressed="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

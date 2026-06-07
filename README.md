@@ -12,6 +12,7 @@ The current project supports:
 - Direct primitives: home, grip, release, and six Cartesian step directions
 - A trained ACT `sort_pills` policy through `lerobot-rollout`
 - An ACT `handover_pill` policy for green or black pill requests
+- A calendar-driven medication schedule that auto-runs the matching pill skill at each event's time
 - Intel RealSense or V4L2 webcam streaming
 - MediaPipe hand openness and palm-up detection
 - Text and Faster-Whisper voice input
@@ -201,6 +202,7 @@ The MCP server exposes:
 - `get_scene`
 - `run_skill`
 - `handover_pill`
+- `list_pill_schedule`, `schedule_pill`, `cancel_pill` (see [Medication Schedule](#medication-schedule))
 
 `get_scene` reports the implemented hand/palm fields only. Object, face, mouth, and
 gaze detection are not advertised because they are not implemented.
@@ -288,6 +290,91 @@ export NURSEARM_HANDOVER_TASK_TEMPLATE='Give the {color} pill to the hand'
 
 Camera keys such as `wrist` and `front` must match the checkpoint's input feature
 names. Do not rename or omit a trained camera.
+
+## Medication Schedule
+
+A calendar event whose label is a pill colour automatically runs the matching skill at
+the event's scheduled time. A green-labelled event at 09:00 hands over the green pill; a
+black-labelled event hands over the black pill; a `sort`-labelled event runs `sort_pills`.
+This is just a convenient way to require a robot skill, automated by a calendar entry.
+
+A background watcher in the server polls the calendar, resolves each event to a trigger,
+and fires the mapped skill once. Firing is serialized with the rest of the robot through a
+shared lock, so a scheduled pill never stacks a rollout on top of a live movement.
+
+### Triggers And Timing
+
+Triggers live in [config/calendar.yaml](config/calendar.yaml). Each trigger maps a calendar
+event to a skill by **colour swatch** (Google `colorId`) **or** by a **keyword** in the event
+title (case-insensitive substring). The first trigger in file order that matches wins.
+
+```yaml
+triggers:
+  green: { color_ids: ["10", "2"], keywords: ["green"], skill: handover_pill, args: { color: green }, label: "Green pill", color_hex: "#0b8043" }
+  black: { color_ids: ["8"],       keywords: ["black"], skill: handover_pill, args: { color: black }, label: "Black pill", color_hex: "#3c4043" }
+  sort:  { color_ids: [],          keywords: ["sort"],  skill: sort_pills,    args: {},               label: "Sort pills", color_hex: "#b8860b" }
+```
+
+Timing knobs in the same file:
+
+| Key | Default | Purpose |
+|---|---|---|
+| `calendar_id` | `primary` | Which calendar to watch |
+| `poll_interval_s` | `30` | How often the watcher reloads events |
+| `countdown_s` | `15` | Auto-pilot cancel window before a due pill runs |
+| `grace_min` | `5` | How long after the scheduled time an event stays runnable |
+| `lookahead_hours` | `24` | How far ahead events are loaded |
+| `auto_pilot` | `true` | Run due pills automatically (see below) |
+
+### How It Behaves
+
+With **Auto-pilot on**, a due pill shows a banner with a `countdown_s` cancel window, then
+runs automatically if the robot is free (it defers while the robot is busy, within the grace
+window). With **Auto-pilot off**, the banner is notify-only — you press **Give now** or
+**Skip**. Each event fires at most once per day; fired and skipped ids are persisted to
+`data/calendar_state.json` so an event never double-fires across a restart, and the record
+resets the next day for daily medications.
+
+In the browser, the **Today's medication** card at the top of the status rail shows the
+connection state, the Auto-pilot switch, today's pill timeline, and an **Add pill** form. A
+global banner appears when a pill is due. On phones the schedule has its own bottom-bar tab.
+
+### Demo Mode (No Calendar Required)
+
+In mock mode (`NURSEARM_MOCK=1`) or whenever Google credentials are absent, an in-memory
+calendar seeds two sample events (a green pill a couple of minutes out and a black pill later
+in the day) so the card, banner, and auto-run flow all work offline. The connection chip
+reads **Demo**.
+
+### Connect A Real Google Calendar
+
+1. Install the optional dependencies:
+
+   ```bash
+   uv sync --extra calendar
+   ```
+
+2. In the Google Cloud Console, enable the **Google Calendar API**, create an **OAuth client
+   ID** of type **Desktop app**, download the JSON, and save it at the repository root as
+   `credentials.json`.
+
+3. Run the one-time consent flow (opens a browser, writes `token.json`):
+
+   ```bash
+   uv run nursearm-calendar-auth
+   ```
+
+4. Restart `nursearm-serve`. The connection chip now reads **Connected**.
+
+`credentials.json` and `token.json` are secrets. They are git-ignored — never commit them.
+
+### Control It Through The Agent
+
+The agent can read and manage the schedule with the `list_pill_schedule`, `schedule_pill`,
+and `cancel_pill` MCP tools. Ask in chat, for example, "What pills are scheduled today?",
+"Schedule the green pill at 9am every day", or "Cancel the 9am pill." The agent confirms the
+pill, time, and repeat before creating or cancelling an event; scheduled pills still auto-run
+at their time, so it does not hand them over itself.
 
 ## ACT Data And Training
 
