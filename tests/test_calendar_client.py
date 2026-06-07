@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from unittest.mock import MagicMock
 
 from nursearm.integrations.google_calendar import FakeCalendarClient, GoogleCalendarClient
 from nursearm.integrations.models import CalendarEvent
@@ -73,3 +74,29 @@ def test_google_status_unconfigured_when_no_credentials(tmp_path: Path) -> None:
     status = client.status()
     assert status["configured"] is False
     assert status["authorized"] is False
+
+
+def test_google_status_checks_event_access_with_event_scope(tmp_path: Path) -> None:
+    credentials_path = tmp_path / "credentials.json"
+    token_path = tmp_path / "token.json"
+    credentials_path.write_text("{}")
+    token_path.write_text("{}")
+    service = MagicMock()
+    service.events.return_value.list.return_value.execute.return_value = {"items": []}
+    client = GoogleCalendarClient(
+        calendar_id="patient@example.com",
+        credentials_path=credentials_path,
+        token_path=token_path,
+    )
+    client._service = service
+
+    status = client.status()
+
+    assert status["authorized"] is True
+    assert status["account"] == "patient@example.com"
+    service.events.return_value.list.assert_called_once_with(
+        calendarId="patient@example.com",
+        maxResults=1,
+        singleEvents=True,
+    )
+    service.calendarList.assert_not_called()
