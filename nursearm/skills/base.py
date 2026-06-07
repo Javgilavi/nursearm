@@ -1,18 +1,4 @@
-"""Skill contract + the two skill kinds from the whiteboard sketch.
-
-The agent fires SKILLS, and the sketch splits them in two — a real decision the judge
-makes every step:
-
-  - PRIMITIVE skills (/move up, /move down) emit a direct, hardcoded movement command
-    straight to the robot. Instant and reliable. No policy, no perception needed.
-  - VLA skills (/vla 1, /vla 2, ...) are language-conditioned policies: the judge hands
-    the skill a PROMPT, the VLA turns it into the actual arm action ("/vla 1 -> prompt
-    of vla"). Slower, learned, for the complex manipulation.
-
-Every skill — both kinds — implements the same `run()/check_success()/reset()` so the
-judge treats them uniformly; only `kind` tells it which is fast/reliable vs slow/learned.
-All planning/recovery intelligence lives in the judge, never here. See AGENT.md §4.
-"""
+"""Skill contracts for deterministic primitives and learned policy rollouts."""
 
 from __future__ import annotations
 
@@ -57,12 +43,7 @@ class Skill(ABC):
 
 
 class PrimitiveSkill(Skill):
-    """A hardcoded movement command straight to the robot (the sketch's /move up|down).
-
-    No policy and no perception: it emits a direct CMD and is considered to have
-    succeeded once the move is sent (primitives are instant and reliable). Subclasses
-    implement ``run()`` with a direct ``robot`` call (e.g. ``robot.jog(...)``).
-    """
+    """A deterministic command sent directly to the robot controller."""
 
     kind: ClassVar[str] = "primitive"
 
@@ -72,11 +53,6 @@ class PrimitiveSkill(Skill):
 
 
 class VLASkill(Skill):
-    """A language-conditioned policy (the sketch's /vla N -> prompt of vla).
-
-    The judge hands it a prompt (or it uses its default ``self.prompt``); the VLA turns
-    that into the arm action via ``robot.run_policy(self.policy_path, task=prompt)``.
-    Subclasses still implement ``check_success()`` to verify the outcome from the camera.
-    """
+    """A learned policy rollout configured with a checkpoint and task prompt."""
 
     kind: ClassVar[str] = "vla"

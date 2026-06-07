@@ -5,7 +5,7 @@ This is a thin convenience wrapper that prints the exact `lerobot-record` comman
 given skill (so the whole team uses consistent dataset names + task strings). Recording
 itself is done by LeRobot.
 
-    python scripts/record_demos.py dispense_pills --episodes 60
+    python scripts/record_demos.py sort_pills --episodes 60
 """
 
 from __future__ import annotations
@@ -25,10 +25,14 @@ def main() -> None:
     rc = config.robot_config()
     skills = config.skills_config().get("skills", {})
     task = skills.get(args.skill, {}).get("task", f"perform the {args.skill} task")
+    follower_port = rc.get("follower_port", "/dev/ttyACM0")
+    follower_id = rc.get("follower_id", "follower")
+    leader_port = rc.get("leader_port", "/dev/ttyACM1")
+    leader_id = rc.get("leader_id", "leader")
 
     cmd = f"""lerobot-record \\
-  --robot.type=so101_follower --robot.port={rc.get('follower_port', '/dev/ttyACM0')} --robot.id={rc.get('follower_id', 'follower')} \\
-  --teleop.type=so101_leader  --teleop.port={rc.get('leader_port', '/dev/ttyACM1')}  --teleop.id={rc.get('leader_id', 'leader')} \\
+  --robot.type=so101_follower --robot.port={follower_port} --robot.id={follower_id} \\
+  --teleop.type=so101_leader --teleop.port={leader_port} --teleop.id={leader_id} \\
   --robot.cameras="{rc.get('camera_arg')}" \\
   --dataset.repo_id={args.hf_user}/nursearm_{args.skill} \\
   --dataset.single_task="{task}" \\

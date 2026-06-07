@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Print the `lerobot-train` command to train an ACT policy for ONE skill.
 
-    python scripts/train_skill.py dispense_pills --steps 60000
+    python scripts/train_skill.py sort_pills --steps 60000
 
 Training is done by LeRobot. This keeps hyper-params + output paths consistent across
 the team and matches the policy_path the skill registry expects (config/skills.yaml).
@@ -10,8 +10,6 @@ the team and matches the policy_path the skill registry expects (config/skills.y
 from __future__ import annotations
 
 import argparse
-
-from nursearm import config
 
 
 def main() -> None:
@@ -37,8 +35,5 @@ def main() -> None:
     print(cmd)
     print(f"\n# Then set policy_path for '{args.skill}' in config/skills.yaml to:")
     print(f"#   {out}/checkpoints/{args.steps:06d}/pretrained_model")
-    _ = config  # config import kept so this stays consistent with the rest of the repo
-
-
 if __name__ == "__main__":
     main()

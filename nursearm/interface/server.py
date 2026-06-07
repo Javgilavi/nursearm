@@ -26,7 +26,7 @@ import tempfile
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated, Any
 
 import cv2
 import numpy as np
@@ -154,7 +154,7 @@ class AppState:
         if depth is None or not isinstance(depth, np.ndarray) or depth.size == 0:
             depth = np.zeros(color.shape[:2], dtype=np.float32)
         if self.perception.mock and not self.perception.has_real_camera:
-            color = self._make_mock_frame(color)
+            color = self._make_offline_frame(color)
         raw_jpg = self._encode_jpg(color)
         palm_jpg = self._encode_jpg(self._draw_palm(color, depth))
         return raw_jpg, palm_jpg
@@ -251,14 +251,14 @@ class AppState:
         except Exception as exc:
             logger.warning("Whisper preload failed: %s", exc)
 
-    async def get_whisper(self) -> "WhisperModel":
+    async def get_whisper(self) -> WhisperModel:
         async with self._whisper_lock:
             if self._whisper is None:
                 self._whisper = await asyncio.to_thread(self._load_whisper)
         return self._whisper
 
     @staticmethod
-    def _load_whisper() -> "WhisperModel":
+    def _load_whisper() -> WhisperModel:
         from faster_whisper import WhisperModel  # noqa: PLC0415
         # RTX 5070 (Blackwell sm_120) crashes with int8 — always use float16 on CUDA.
         try:
@@ -320,17 +320,18 @@ class AppState:
         }
 
     @staticmethod
-    def _make_mock_frame(color: np.ndarray) -> np.ndarray:
+    def _make_offline_frame(color: np.ndarray) -> np.ndarray:
         frame = color.copy()
         frame[:] = (28, 24, 34)
-        cv2.rectangle(frame, (40, 60), (600, 420), (78, 64, 48), thickness=-1)
-        cv2.rectangle(frame, (80, 110), (280, 350), (214, 70, 40), thickness=-1)
-        cv2.rectangle(frame, (360, 140), (540, 280), (55, 120, 222), thickness=-1)
-        cv2.rectangle(frame, (320, 360), (560, 430), (46, 122, 82), thickness=-1)
-        cv2.putText(frame, "Mock RealSense RGB-D feed", (56, 42), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (234, 235, 240), 2)
-        cv2.putText(frame, "Coke can", (104, 240), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
-        cv2.putText(frame, "Cup", (420, 220), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
-        cv2.putText(frame, "Notebook", (380, 405), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
+        cv2.putText(
+            frame,
+            "No camera connected",
+            (155, 235),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.9,
+            (234, 235, 240),
+            2,
+        )
         return frame
 
 
@@ -367,6 +368,7 @@ def _ensure_ollama() -> None:
 def _ensure_ngrok(port: int = 8000) -> str | None:
     """Start ngrok if not running and return the public HTTPS URL. No-op if ngrok is not installed."""
     import shutil
+
     import httpx
 
     if not shutil.which("ngrok"):
@@ -446,6 +448,7 @@ async def qr_svg() -> Response:
     if not _ngrok_url:
         raise HTTPException(status_code=404, detail="No remote tunnel active")
     import io
+
     import segno
     qr = segno.make_qr(_ngrok_url, error="m")
     buf = io.BytesIO()
@@ -542,7 +545,7 @@ async def palm_status() -> dict[str, Any]:
 
 
 @app.post("/transcribe")
-async def transcribe(audio: UploadFile = File(...)) -> dict[str, str]:
+async def transcribe(audio: Annotated[UploadFile, File()]) -> dict[str, str]:
     """Transcribe uploaded audio (WebM/Opus or any ffmpeg format) via Faster-Whisper."""
     data = await audio.read()
     suffix = Path(audio.filename or "recording.webm").suffix or ".webm"

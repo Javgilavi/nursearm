@@ -69,23 +69,6 @@ def run_skill(name: str, args: dict[str, Any] | None = None) -> dict[str, Any]:
     return runtime().run_skill(name, args)
 
 
-@mcp.tool()
-def run_vla(task: str) -> dict[str, Any]:
-    """Run the NurseArm VLA (Vision-Language-Action) policy for any physical task.
-
-    Use this for ALL manipulation requests: dispensing medication, feeding, picking up
-    objects, handing things over. Describe the task in natural language — the VLA
-    figures out the arm motions from the live camera and the task description.
-
-    Examples:
-      task="give the person their morning pills"
-      task="feed the person some food from the bowl"
-      task="pick up the red cup and hand it to the person"
-    """
-    result = runtime().run_skill("vla", {"task": task})
-    return {"skill": "vla", "task": task, **result}
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run the NurseArm MCP server.")
     parser.add_argument(

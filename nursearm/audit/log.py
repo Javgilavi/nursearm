@@ -1,5 +1,4 @@
-"""Append-only, timestamped audit log. The source of truth for the demo and the
-healthcare safety story. Every judge decision and robot action lands here.
+"""Append-only, timestamped log of agent decisions and robot actions.
 
 Writes newline-delimited JSON (JSONL) to ``data/audit/<session>.jsonl`` and also
 fans events out to any subscribers (e.g. the web UI over a WebSocket).
@@ -10,10 +9,10 @@ from __future__ import annotations
 import json
 import logging
 import threading
-import time
-from datetime import datetime, timezone
+from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +33,7 @@ class AuditLog:
         self._subscribers.append(fn)
 
     def log(self, event: dict[str, Any]) -> dict[str, Any]:
-        record = {"ts": datetime.now(timezone.utc).isoformat(), "session": self.session_id, **event}
+        record = {"ts": datetime.now(UTC).isoformat(), "session": self.session_id, **event}
         line = json.dumps(record, default=str)
         with self._lock:
             with self.path.open("a") as f:

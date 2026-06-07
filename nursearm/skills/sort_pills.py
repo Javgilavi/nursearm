@@ -1,14 +1,4 @@
-"""sort_pills — run the trained ACT policy that sorts the two pills into their cups.
-
-Unlike dispense_pills (which needs a perception pill-classifier to choose a target),
-this skill is a single self-contained behaviour: the ACT policy was trained on the
-full sort (locate both pills, pick, place in the matching cup) and does it end-to-end
-from the camera. So the skill just hands the policy + task to the controller and lets
-``lerobot-rollout`` drive the arm.
-
-The policy path and task string come from ``config/skills.yaml`` and MUST match the
-training run (camera config + task string), which they do via ``config/robot.yaml``.
-"""
+"""Run the trained ACT policy that sorts two pills into matching cups."""
 
 from __future__ import annotations
 
@@ -25,7 +15,11 @@ if TYPE_CHECKING:
 class SortPills(VLASkill):
     def run(self, args: dict[str, Any], robot: RobotController, perception: Perception) -> SkillResult:
         if not self.policy_path:
-            return SkillResult(False, 0.0, note="sort_pills has no policy_path set in skills.yaml")
+            return SkillResult(
+                False,
+                0.0,
+                note="set NURSEARM_SORT_PILLS_POLICY to the trained checkpoint",
+            )
 
         task = args.get("task") or self.prompt or "Sort the pills into the cups"
         duration_s = args.get("duration_s")  # optional override
@@ -35,7 +29,7 @@ class SortPills(VLASkill):
         robot.run_policy(self.policy_path, task=task, duration_s=duration_s)
 
         ok, conf = self.check_success(perception)
-        note = "ran ACT sort policy" if ok else "sort policy ran but success not verified"
+        note = "ACT rollout completed; physical outcome is not visually verified"
         frame = None
         try:
             frame = perception.observe().frame
@@ -44,7 +38,4 @@ class SortPills(VLASkill):
         return SkillResult(ok, conf, note=note, frame=frame)
 
     def check_success(self, perception: Perception) -> tuple[bool, float]:
-        # The rollout completed without error. Visual verification (both pills in the
-        # correct cups) is not implemented yet, so report moderate confidence rather
-        # than a false certainty. Wire a perception check here to trust it fully.
-        return True, 0.6
+        return False, 0.0

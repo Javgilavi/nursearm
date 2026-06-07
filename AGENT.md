@@ -1,117 +1,53 @@
-# AGENT.md - the NurseArm orchestrator
+# NurseArm Agent
 
-The orchestrator is the decision-making layer between the browser and the MCP tools.
-MCP discovers and executes capabilities; it does not decide what to do.
-
-## Runtime architecture
+The browser sends text to either `OllamaMCPAgent` or `ClaudeMCPAgent`. The selected
+agent discovers MCP tools, calls only those tools, appends the structured result to
+its conversation, and returns a concise response.
 
 ```text
-Browser text chat
-      |
-      v
-FastAPI interface
-      |
-      v
-OllamaMCPAgent (Qwen3:4b by default)
-      |
-      v
-NurseArmMCPClient
-      |
-      v
-NurseArm MCP server
-      |
-      v
-SkillRegistry -> primitive or VLA skill -> RobotController
+Browser -> FastAPI -> Ollama or Claude agent -> MCP client -> MCP server
+                                                        -> SkillRegistry
+                                                        -> RobotController
 ```
 
-The browser never receives model credentials or direct robot access. The default model
-runs locally through Ollama at `http://127.0.0.1:11434`, so the UI requires no paid API
-key or external model token.
+The active tool boundary is:
 
-## Responsibilities
+- `list_skills`: inspect enabled capabilities
+- `get_scene`: read implemented hand/palm state
+- `run_skill`: execute a named primitive or ACT skill
 
-### FastAPI interface
+The agent must not claim success unless the returned `SkillResult.success` is true.
+The LLM does not receive raw motor access and does not run the real-time control loop.
 
-`nursearm/interface/server.py` owns application startup, the audit log, the local agent,
-and one persistent stdio MCP connection. Starting the interface automatically starts
-the NurseArm MCP subprocess and closes it during shutdown.
+Conversation history is kept in memory for the server process. Agent and tool events
+are appended to `data/audit/<session>.jsonl`.
 
-### Orchestrator
+## Backends
 
-`nursearm/orchestrator/ollama_agent.py`:
-
-1. receives one user message,
-2. discovers current MCP tools,
-3. converts their schemas to Ollama function tools,
-4. sends the request and tools to the local model,
-5. executes requested tools through the MCP client,
-6. feeds structured results back to the model,
-7. repeats until the model returns a final response,
-8. enforces a maximum turn count and writes audit events.
-
-`nursearm/orchestrator/judge.py` remains a compatibility import for the active local
-orchestrator.
-
-### MCP client
-
-`nursearm/mcp/client.py` only manages MCP transport and protocol operations:
-
-- initialize the local stdio session,
-- list tools,
-- call tools,
-- decode structured results.
-
-It contains no model-specific reasoning. This keeps the MCP client reusable with
-Ollama, Codex, OpenClaw, Claude Desktop, or another model host.
-
-### MCP server
-
-`nursearm/mcp/server.py` is the canonical capability boundary. It exposes task-level
-tools and dispatches approved actions through `SkillRegistry`. It never exposes raw
-joints, arbitrary shell commands, or direct motor access.
-
-## Local model
-
-The default configuration is:
+Ollama is the default:
 
 ```text
+AGENT_BACKEND=ollama
 OLLAMA_URL=http://127.0.0.1:11434
 OLLAMA_MODEL=qwen3:4b
 ```
 
-Qwen3:4b is a practical starting point for local tool selection. Larger local models
-can improve planning but require more VRAM/RAM. Switching the model does not change MCP
-or robot code.
+Claude requires:
 
-## Safety rules
-
-- The model may invoke only tools exposed by the MCP server.
-- Tool arguments are validated by the MCP schema and skill implementation.
-- The model must not report success until a tool returns success.
-- Medication and human-contact tasks require explicit confirmation and deterministic
-  checks in the skill layer.
-- Joint limits, workspace limits, collision checks, and emergency stop behavior belong
-  in `RobotController`, never in the language model.
-- The LLM is task-level only and must not run the real-time robot control loop.
-
-## External model clients
-
-The same MCP server can run independently over Streamable HTTP:
-
-```bash
-NURSEARM_MOCK=1 uv run nursearm-mcp --transport streamable-http
+```text
+AGENT_BACKEND=claude
+ANTHROPIC_API_KEY=...
+CLAUDE_MODEL=claude-sonnet-4-6
 ```
 
-Codex, MCP Inspector, OpenClaw, or another compatible client can connect to
-`http://127.0.0.1:8000/mcp`. Those clients provide their own orchestration; the browser
-continues to use the local Ollama orchestrator.
+Both backends enforce a maximum of 12 model turns per user request.
 
-## Current test capabilities
+## Safety Boundary
 
-The dummy MCP skills are intentionally safe and never move hardware:
+- Skill names and arguments are validated through MCP schemas and the registry.
+- Learned policy execution is isolated in a `lerobot-rollout` subprocess.
+- Robot limits, collision handling, authentication, and emergency-stop behavior must
+  be enforced below the LLM layer.
+- Mock mode prevents hardware access but does not fabricate ACT success.
 
-- `skill1_check_environment` -> `skill1 completed`
-- `skill2_prepare_assistance` -> `skill2 completed`
-- `skill3_confirm_handoff` -> `skill3 completed`
-
-Replace or disable them as real perception, primitive, and VLA skills become reliable.
+See the limitations in [README.md](README.md) before using real hardware.

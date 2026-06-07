@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Offline MCP smoke test: discover tools and execute all dummy skills."""
+"""Offline MCP smoke test for the current skill registry."""
 
 from __future__ import annotations
 
@@ -13,27 +13,40 @@ async def run() -> None:
     await client.connect()
     try:
         tools = {tool.name for tool in await client.list_tools()}
-        expected = {
-            "list_skills",
-            "run_skill",
-            "skill1_check_environment",
-            "skill2_prepare_assistance",
-            "skill3_confirm_handoff",
-        }
+        expected = {"list_skills", "get_scene", "run_skill"}
         missing = expected - tools
         if missing:
             raise AssertionError(f"missing MCP tools: {sorted(missing)}")
 
-        cases = {
-            "skill1_check_environment": "skill1 completed",
-            "skill2_prepare_assistance": "skill2 completed",
-            "skill3_confirm_handoff": "skill3 completed",
+        skills = await client.call_tool("list_skills")
+        names = {item["name"] for item in skills["result"]}
+        expected_skills = {
+            "home",
+            "grip",
+            "release",
+            "move_up",
+            "move_down",
+            "move_forward",
+            "move_back",
+            "move_left",
+            "move_right",
+            "sort_pills",
         }
-        for tool_name, expected_note in cases.items():
-            result = await client.call_tool(tool_name, {"request": "offline smoke test"})
-            if not result.get("success") or result.get("note") != expected_note:
-                raise AssertionError(f"{tool_name} returned {result!r}")
-            print(f"PASS {tool_name}: {result['note']}")
+        if names != expected_skills:
+            raise AssertionError(f"unexpected skills: {sorted(names)}")
+
+        result = await client.call_tool("run_skill", {"name": "home", "args": {}})
+        if not result.get("success"):
+            raise AssertionError(f"home returned {result!r}")
+
+        policy_result = await client.call_tool(
+            "run_skill",
+            {"name": "sort_pills", "args": {}},
+        )
+        if policy_result.get("success"):
+            raise AssertionError("sort_pills must not report success without a checkpoint")
+
+        print("PASS tools, registry, home primitive, and missing-policy failure")
     finally:
         await client.close()
 

@@ -1,16 +1,7 @@
 """RealSense RGB-D capture + the unified Perception service.
 
-Perception is a SHARED service: both the judge (situational awareness via get_scene)
-and the skills (targeting) call it. The core RGB-D pattern (see README §6) is:
-
-    1. MediaPipe on the COLOR frame -> 2D landmarks (mouth, palm, eyes).
-    2. rs.align depth->color so every color pixel has a depth value.
-    3. rs.rs2_deproject_pixel_to_point(pixel, depth) -> 3D point in CAMERA frame.
-    4. apply the hand-eye transform (config/robot.yaml) -> ROBOT BASE frame.
-    5. hand that 3D target to the skill / servo loop.
-
-This module owns steps 1-4. The face/gaze/hands/objects sub-modules implement the
-landmark extraction; this class wires them together into a SceneObservation.
+This module owns camera capture, depth alignment, coordinate deprojection, and the
+implemented MediaPipe hand/palm observation pipeline.
 """
 
 from __future__ import annotations
@@ -23,14 +14,9 @@ import cv2
 import numpy as np
 
 from nursearm import config
-from nursearm.types import DetectedObject, Point3D, SceneObservation
+from nursearm.types import Point3D, SceneObservation
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class FaceObservation:
-    mouth_point: Point3D | None
 
 
 @dataclass
@@ -146,43 +132,21 @@ class Perception:
 
     # -- high-level observations -------------------------------------------------
     def observe(self) -> SceneObservation:
-        """Full scene understanding for the judge's get_scene tool."""
+        """Return the implemented hand/palm scene observation."""
         color, _ = self.frames()
-        face = self.face()
         hand = self.hands()
-        objects = self.objects()
-        gaze = self.gaze_target(objects)
         return SceneObservation(
-            objects=objects,
-            face_visible=face is not None and face.mouth_point is not None,
-            mouth_point=face.mouth_point if face else None,
             hand_open=hand.is_open if hand else None,
             palm_point=hand.palm_point if hand else None,
             palm_up=hand.palm_up if hand else None,
             palm_up_confidence=hand.palm_up_confidence if hand else None,
-            gaze_target=gaze,
             frame=color,
         )
-
-    def face(self) -> FaceObservation | None:
-        from nursearm.perception import face as face_mod
-
-        return face_mod.detect(self)
 
     def hands(self) -> HandObservation | None:
         from nursearm.perception import hands as hands_mod
 
         return hands_mod.detect(self)
-
-    def objects(self) -> list[DetectedObject]:
-        from nursearm.perception import objects as objects_mod
-
-        return objects_mod.detect(self)
-
-    def gaze_target(self, objects: list[DetectedObject] | None = None) -> DetectedObject | None:
-        from nursearm.perception import gaze as gaze_mod
-
-        return gaze_mod.target(self, objects if objects is not None else self.objects())
 
     def close(self) -> None:
         if self._pipeline is not None:

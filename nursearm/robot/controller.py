@@ -9,10 +9,8 @@ from __future__ import annotations
 import logging
 import subprocess
 import time
-from collections.abc import Callable
 
 from nursearm import config
-from nursearm.types import Point3D
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +35,6 @@ class RobotController:
         self.port = rc.get("follower_port", "/dev/ttyACM0")
         self.robot_id = rc.get("follower_id", "follower")
         self.camera_arg = rc.get("camera_arg", "")
-        self.max_jump_m = rc.get("safe_stop_max_jump_m", 0.08)
         # Policy rollout settings (must match how the policy was trained).
         self.fps = rc.get("fps", 15)
         self.policy_device = rc.get("policy_device", "cuda")
@@ -170,7 +167,6 @@ class RobotController:
         self,
         policy_path: str | None,
         task: str,
-        target: Point3D | None = None,
         duration_s: float | None = None,
     ) -> None:
         """Run a full trained-skill rollout (Option B: lerobot-rollout subprocess).
@@ -181,7 +177,7 @@ class RobotController:
         """
         duration_s = self.rollout_duration_s if duration_s is None else duration_s
         if self.mock or not policy_path:
-            logger.info("[mock] run_policy(%s, task=%r, target=%s)", policy_path, task, target)
+            logger.info("[mock] run_policy(%s, task=%r)", policy_path, task)
             return
 
         # lerobot-rollout opens the arm itself — release our in-process handle first,
@@ -212,13 +208,6 @@ class RobotController:
         finally:
             if reconnect:
                 self._connect()
-
-    def servo_to(self, point: Point3D, standoff_m: float = 0.05,
-                 track: Callable[[], Point3D | None] | None = None) -> None:
-        if self.mock:
-            logger.info("[mock] servo_to(%s, standoff=%.3f)", point, standoff_m)
-            return
-        raise NotImplementedError("servo_to requires IK — not yet implemented.")
 
     def disconnect(self) -> None:
         if self._bus is not None:

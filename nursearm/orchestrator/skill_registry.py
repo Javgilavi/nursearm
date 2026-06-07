@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import logging
+import os
 from typing import TYPE_CHECKING, Any
 
 from nursearm import config
@@ -30,10 +31,13 @@ class SkillRegistry:
                 continue
             module_path, _, cls_name = spec["class"].rpartition(".")
             cls = getattr(importlib.import_module(module_path), cls_name)
+            policy_path = spec.get("policy_path")
+            if policy_env := spec.get("policy_env"):
+                policy_path = os.getenv(policy_env) or policy_path
             skill = cls(
                 name=name,
                 description=spec["description"],
-                policy_path=spec.get("policy_path"),
+                policy_path=policy_path,
                 prompt=spec.get("prompt", spec.get("task")),
             )
             configured_kind = spec.get("type", "vla")

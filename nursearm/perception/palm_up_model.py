@@ -86,7 +86,10 @@ def feature_vector(
     else:
         finger_axis = np.zeros(3, dtype=np.float32)
 
-    base_normal = np.array(base_palm_normal if base_palm_normal is not None else (0.0, 0.0, 0.0), dtype=np.float32)
+    base_normal = np.array(
+        base_palm_normal if base_palm_normal is not None else (0.0, 0.0, 0.0),
+        dtype=np.float32,
+    )
     features = np.concatenate(
         [
             norm.astype(np.float32).reshape(-1),

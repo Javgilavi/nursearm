@@ -22,11 +22,8 @@ policy_device: cuda                  # cuda | cpu | mps
 policy_temporal_ensemble_coeff: 0.01 # ACT smoothing (avoids the jerky chunk boundaries)
 rollout_duration_s: 30              # seconds per run_policy call
 
-# Safe-stop: halt the arm if a tracked body part jumps more than this (metres) per frame.
-safe_stop_max_jump_m: 0.08
-
 # Hand-eye transform: 4x4 matrix mapping CAMERA frame -> ROBOT BASE frame.
-# Identity = NOT calibrated (servo_to will aim wrong). Run hand-eye calibration and paste here.
+# Identity = NOT calibrated. Run hand-eye calibration before camera-guided motion.
 hand_eye_transform:
   - [1.0, 0.0, 0.0, 0.0]
   - [0.0, 1.0, 0.0, 0.0]

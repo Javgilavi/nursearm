@@ -106,7 +106,6 @@ class FeetechBus:
         self._connected = False
 
     def connect(self) -> None:
-        scs = self._scs
         if not self._port_handler.openPort():
             raise RuntimeError(f"Cannot open port: {self._port_handler.port_name}")
         if not self._port_handler.setBaudRate(_BAUD):
@@ -153,7 +152,6 @@ class FeetechBus:
                 logger.warning("write_positions: motor %s comm=%s err=%s", name, comm, err)
 
     def set_torque(self, enabled: bool) -> None:
-        scs = self._scs
         val = 1 if enabled else 0
         for motor_id in MOTOR_IDS.values():
             self._packet_handler.write1ByteTxRx(

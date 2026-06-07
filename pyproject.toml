@@ -1,14 +1,13 @@
 [project]
 name = "nursearm"
 version = "0.1.0"
-description = "Assistive SO-101 robot arm driven by an LLM orchestrator (judge + skills + RGB-D perception)."
+description = "SO-101 robot arm controlled through LLM-selected primitives and ACT policies."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
     "httpx>=0.28",
     "uvicorn[standard]>=0.30",
-    "websockets>=12",
     "python-dotenv>=1.0",
     "pyyaml>=6.0",
     "numpy>=1.26",
@@ -28,15 +27,6 @@ dependencies = [
 [project.optional-dependencies]
 robot = [
     "pyrealsense2>=2.55",
-    "mediapipe>=0.10",
-]
-voice = [
-    "deepgram-sdk>=3.5",
-]
-calendar = [
-    "google-api-python-client>=2.130",
-    "google-auth-oauthlib>=1.2",
-    "google-auth>=2.30",
 ]
 dev = [
     "ruff>=0.6",

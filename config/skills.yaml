@@ -75,21 +75,6 @@ skills:
       Args: {step_m: <metres>}.
     enabled: true
 
-  vla:
-    type: vla
-    class: nursearm.skills.vla.NurseArmVLA
-    description: >
-      The NurseArm VLA (Vision-Language-Action) policy. Accepts any physical
-      assistance task described in natural language and figures out the arm
-      motions from the live camera and task description. Use for medication
-      dispensing, feeding, picking up objects, or any manipulation task.
-      Set policy_path to the trained lerobot checkpoint when ready.
-      Args: {task: <natural language description>}.
-    task: "execute the requested physical assistance task"
-    policy_path: null
-    enabled: true
-
-  # ---- Trained ACT skills (enabled) ----------------------------------------
   sort_pills:
     type: vla
     class: nursearm.skills.sort_pills.SortPills
@@ -99,10 +84,5 @@ skills:
       end-to-end from the cameras. Use when the person asks to sort, organise, or put
       away the pills into the cups. Args: {duration_s: <optional seconds>}.
     task: "Sort two mock pills, green to green cup and black to black cup"
-    policy_path: /home/simone/lerobot/outputs/train/act_sort/checkpoints/last/pretrained_model
+    policy_env: NURSEARM_SORT_PILLS_POLICY
     enabled: true
-
-# Used by integrations.calendar.MockCalendarClient when USE_GOOGLE_CALENDAR != 1.
-mock_medication_schedule:
-  - {name: Aspirin,   dose: 100mg,  time: "09:00"}
-  - {name: Metformin, dose: 500mg,  time: "09:00"}

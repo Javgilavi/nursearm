@@ -22,18 +22,18 @@ class FakeMCPClient:
     async def list_tools(self) -> list[Any]:
         return [
             SimpleNamespace(
-                name="skill1_check_environment",
-                description="Inspect the environment without moving hardware.",
+                name="move_up",
+                description="Move the robot end effector up.",
                 inputSchema={
                     "type": "object",
-                    "properties": {"request": {"type": "string"}},
+                    "properties": {"step_m": {"type": "number"}},
                 },
             )
         ]
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         self.calls.append((name, arguments))
-        return {"success": True, "confidence": 1.0, "note": "skill1 completed"}
+        return {"success": True, "confidence": 1.0, "note": "moved up"}
 
 
 @pytest.mark.anyio
@@ -54,8 +54,8 @@ async def test_agent_calls_mcp_tool_and_returns_final_reply(monkeypatch: pytest.
                         "tool_calls": [
                             {
                                 "function": {
-                                    "name": "skill1_check_environment",
-                                    "arguments": {"request": "inspect the room"},
+                                    "name": "move_up",
+                                    "arguments": {"step_m": 0.02},
                                 }
                             }
                         ],
@@ -77,11 +77,11 @@ async def test_agent_calls_mcp_tool_and_returns_final_reply(monkeypatch: pytest.
         await http.aclose()
 
     assert reply == "Inspection completed."
-    assert mcp.calls == [("skill1_check_environment", {"request": "inspect the room"})]
+    assert mcp.calls == [("move_up", {"step_m": 0.02})]
     assert requests[0]["model"] == "qwen3:4b"
-    assert requests[0]["tools"][0]["function"]["name"] == "skill1_check_environment"
+    assert requests[0]["tools"][0]["function"]["name"] == "move_up"
     assert requests[1]["messages"][-1]["content"] == (
-        '{"success": true, "confidence": 1.0, "note": "skill1 completed"}'
+        '{"success": true, "confidence": 1.0, "note": "moved up"}'
     )
 
 

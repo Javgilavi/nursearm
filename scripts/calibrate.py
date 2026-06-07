@@ -9,7 +9,7 @@ Robot calibration is done with LeRobot's own CLI (most reliable):
 
 After that, fill config/robot.yaml with the port, the id, and the HAND-EYE TRANSFORM
 (4x4, camera->base). The hand-eye transform is what turns a 3D camera point into a
-robot-frame target; without it servo_to aims at the wrong place.
+robot-frame target for future camera-guided motion.
 
 This script just prints the steps and checks config/robot.yaml is populated.
 """

@@ -177,14 +177,13 @@ def _hands_solution():
                 min_tracking_confidence=0.5,
             )
             _MP_HANDS_KIND = "solutions"
-        except AttributeError:
-            from mediapipe.tasks.python import BaseOptions
-            from mediapipe.tasks.python import vision
+        except AttributeError as exc:
+            from mediapipe.tasks.python import BaseOptions, vision
 
             if not _TASK_MODEL_PATH.exists():
                 raise RuntimeError(
                     f"missing hand landmarker model bundle: {_TASK_MODEL_PATH}"
-                )
+                ) from exc
             options = vision.HandLandmarkerOptions(
                 base_options=BaseOptions(model_asset_path=str(_TASK_MODEL_PATH)),
                 num_hands=1,
