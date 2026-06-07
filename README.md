@@ -418,6 +418,29 @@ reads **Demo**.
 > `NURSEARM_CALENDAR_REAL=1` forces the real Google client even while `NURSEARM_MOCK=1`
 > keeps the robot/cameras mocked — handy for testing or demoing the schedule on a laptop.
 
+### Follow A Patient's Calendar From A Caregiver's Machine
+
+NurseArm reads **one** calendar: the one named in `config/calendar.yaml` → `calendar_id`,
+through whichever Google account ran `nursearm-calendar-auth` on the host. `calendar_id`
+ships set to the patient's address (`simoutili@gmail.com`) so the robot follows the
+patient's schedule no matter who runs it. To let a caregiver's machine read the patient's
+calendar **without sharing the patient's login**:
+
+1. **Patient** shares the calendar: Google Calendar → **Settings → [their calendar] →
+   Share with specific people or groups → Add people →** enter the caregiver's Gmail →
+   permission **"See all event details"** (or "Make changes to events" to let the robot
+   add/cancel pills) → **Send**.
+2. **Caregiver** accepts the share (email link or it appears under "Other calendars").
+3. On the caregiver's machine, the caregiver runs `nursearm-calendar-auth` with **their
+   own** Google account.
+4. Confirm `config/calendar.yaml` has `calendar_id: simoutili@gmail.com` (the patient's
+   address — already set). Restart `nursearm-serve`.
+
+The robot now fires pills from the patient's shared calendar; the caregiver never handles
+the patient's credentials. (Alternatively, run `nursearm-calendar-auth` signed in as the
+patient and leave `calendar_id` as the patient's address or `primary` — simpler, but the
+patient's `token.json` then lives on that machine.)
+
 ### Control It Through The Agent
 
 The agent can read and manage the schedule with the `list_pill_schedule`, `schedule_pill`,

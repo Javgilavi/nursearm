@@ -18,8 +18,11 @@ countdown_s: 15
 # The UI toggle overrides this at runtime.
 auto_pilot: true
 
-# Which Google calendar to read. "primary" is the signed-in user's main calendar.
-calendar_id: primary
+# Which Google calendar the robot follows. Set to the patient's address so any caregiver
+# who runs NurseArm (and authorizes their OWN Google account) reads the patient's shared
+# calendar instead of their own. Use "primary" for the signed-in account's own calendar.
+# The chosen calendar must be shared with whichever Google account ran nursearm-calendar-auth.
+calendar_id: simoutili@gmail.com
 
 # How far ahead (hours) the panel lists upcoming events.
 lookahead_hours: 24
