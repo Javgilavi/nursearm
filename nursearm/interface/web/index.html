@@ -3,273 +3,241 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>NurseArm · 護士臂</title>
+    <title>MediPalm AI · Healthcare Robotics</title>
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
-    <div class="app-shell">
-      <div class="workspace">
-        <aside class="rail" aria-label="System summary">
-          <div class="rail-brand">
-            <p class="eyebrow">
-              <!-- Bauhinia flower — Hong Kong emblem -->
-              <svg class="bauhinia-icon" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" fill="currentColor" aria-hidden="true">
-                <g transform="translate(20,20)">
-                  <ellipse rx="5" ry="13" transform="rotate(0)   translate(0,-8)"/>
-                  <ellipse rx="5" ry="13" transform="rotate(72)  translate(0,-8)"/>
-                  <ellipse rx="5" ry="13" transform="rotate(144) translate(0,-8)"/>
-                  <ellipse rx="5" ry="13" transform="rotate(216) translate(0,-8)"/>
-                  <ellipse rx="5" ry="13" transform="rotate(288) translate(0,-8)"/>
-                  <circle r="3"/>
-                </g>
-              </svg>
-              NurseArm
+    <div class="site-shell">
+      <header class="site-header">
+        <a class="brand" href="#hero" aria-label="MediPalm AI home">
+          <span class="brand-mark">M</span>
+          <span class="brand-copy">
+            <strong>MediPalm AI</strong>
+            <span>Robotics &amp; AI for Hong Kong healthcare</span>
+          </span>
+        </a>
+
+        <nav class="site-nav" aria-label="Primary">
+          <a href="#problem">Problem</a>
+          <a href="#solution">Solution</a>
+          <a href="#features">Features</a>
+          <a href="#pitch">Pitch</a>
+          <a href="/business">Business Plan</a>
+        </nav>
+
+        <div class="header-actions">
+          <a class="button button-ghost" href="/business">Read Business Plan</a>
+          <a class="button button-primary" href="/console">View Patient Console</a>
+        </div>
+      </header>
+
+      <main>
+        <section class="hero" id="hero">
+          <div class="hero-copy card">
+            <p class="eyebrow">Healthcare Robotics · Hong Kong</p>
+            <h1>MediPalm AI</h1>
+            <p class="hero-subtitle">AI-powered medication dispensing for safer independent living.</p>
+            <p class="hero-text">
+              MediPalm AI combines two LeRobot robotic arms, Intel vision and a conversational assistant to help patients
+              receive the right medication at the right time. Medication is only dispensed when an open palm facing upward
+              is detected, giving the workflow a visible and safe handoff condition.
             </p>
-            <h1>Clinical console</h1>
-            <p class="zh-title" lang="zh-HK">護士臂臨床控制台</p>
-            <p class="subtitle">Low-noise control surface for bedside assistance.</p>
+            <div class="hero-actions">
+              <a class="button button-primary" href="/console">View Patient Console</a>
+              <a class="button button-ghost" href="/business">Read Business Plan</a>
+            </div>
+
+            <div class="hero-feature-grid">
+              <article class="hero-feature-card">
+                <p class="panel-label">Medication adherence</p>
+                <h3>Structured support for repeated daily doses</h3>
+              </article>
+              <article class="hero-feature-card">
+                <p class="panel-label">AI-powered dispensing</p>
+                <h3>Schedule, chatbot and robotic execution in one flow</h3>
+              </article>
+              <article class="hero-feature-card">
+                <p class="panel-label">Robotic handoff safety</p>
+                <h3>Medication is dispensed only after palm verification</h3>
+              </article>
+            </div>
+
+            <div class="impact-strip">
+              <div class="impact-item">
+                <span class="metric-label">24/7 availability</span>
+                <strong>Always-on bedside support</strong>
+              </div>
+              <div class="impact-item">
+                <span class="metric-label">AI-assisted dispensing</span>
+                <strong>Guided medication workflow</strong>
+              </div>
+              <div class="impact-item">
+                <span class="metric-label">Open-palm verification</span>
+                <strong>Visible safety gating</strong>
+              </div>
+              <div class="impact-item">
+                <span class="metric-label">Medication logging</span>
+                <strong>Caregiver-ready traceability</strong>
+              </div>
+            </div>
           </div>
 
-          <section class="rail-stack">
-            <article class="rail-card status-card status-online">
-              <div class="status-row">
-                <span class="status-dot"></span>
-                <span class="status-label">System · <span lang="zh-HK">系統</span></span>
+          <div class="hero-visual card">
+            <div class="hero-summary">
+              <p class="eyebrow">Product Flow</p>
+              <h2>How MediPalm AI works</h2>
+              <div class="process-list">
+                <article class="process-step">
+                  <span>1</span>
+                  <p>Patient asks for medication through the chatbot or a scheduled reminder.</p>
+                </article>
+                <article class="process-step">
+                  <span>2</span>
+                  <p>System verifies the selected medication and the next scheduled dose.</p>
+                </article>
+                <article class="process-step">
+                  <span>3</span>
+                  <p>Intel camera detects an open palm facing upward.</p>
+                </article>
+                <article class="process-step">
+                  <span>4</span>
+                  <p>LeRobot arm dispenses the pill safely into the patient’s hand.</p>
+                </article>
+                <article class="process-step">
+                  <span>5</span>
+                  <p>Dose is logged for caregivers and healthcare providers.</p>
+                </article>
               </div>
-              <strong>Online <em lang="zh-HK">在線</em></strong>
-              <span>System ready · <span lang="zh-HK">系統就緒</span></span>
-            </article>
-            <article class="rail-card status-card status-synced">
-              <div class="status-row">
-                <span class="status-dot"></span>
-                <span class="status-label">Cameras · <span lang="zh-HK">鏡頭</span></span>
+              <div class="summary-badges">
+                <span class="summary-badge success">Palm-up verification</span>
+                <span class="summary-badge success">Robotic handoff</span>
+                <span class="summary-badge success">Medication adherence log</span>
+                <span class="summary-badge">Hong Kong elderly care</span>
               </div>
-              <strong>Synced <em lang="zh-HK">同步</em></strong>
-              <span>Live stream · <span lang="zh-HK">直播已啟動</span></span>
-            </article>
-          </section>
-
-          <!-- 3D Digital Twin — big on desktop, shown in status tab on mobile -->
-          <canvas id="robot-3d" class="robot-3d" aria-label="SO-101 3D digital twin"></canvas>
-
-          <!-- Motor graph (status tab on mobile) -->
-          <section class="robot-panel" id="robot-panel">
-            <p class="panel-kicker">SO-101 · 關節位置</p>
-            <canvas id="motor-graph" class="motor-graph" aria-label="Motor position history"></canvas>
-            <div class="motor-legend" id="motor-legend" aria-hidden="true"></div>
-          </section>
-
-          <section id="remote-access" class="rail-remote" hidden>
-            <p class="rail-foot-label">Remote access</p>
-            <img id="qr-image" class="qr-image" alt="Scan to connect" />
-            <a id="ngrok-link" class="ngrok-link" href="#" target="_blank" rel="noopener"></a>
-          </section>
-
-          <section class="rail-foot">
-            <p class="rail-foot-label">Focus</p>
-            <p>Watch the camera overview, then issue short chat commands.</p>
-          </section>
-
-          <!-- Victoria Harbour skyline silhouette — viewed from Tsim Sha Tsui -->
-          <div class="hk-skyline" aria-hidden="true">
-            <svg viewBox="0 0 220 64" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
-
-              <!-- Sheung Wan / Western district — low-rise backdrop -->
-              <rect x="0"   y="54" width="4"  height="10"/>
-              <rect x="5"   y="50" width="5"  height="14"/>
-              <rect x="12"  y="45" width="6"  height="19"/>
-              <rect x="20"  y="48" width="4"  height="16"/>
-              <rect x="26"  y="42" width="5"  height="22"/>
-              <rect x="33"  y="38" width="6"  height="26"/>
-
-              <!-- One IFC — medium-tall adjacent to IFC2 -->
-              <rect x="41"  y="28" width="7"  height="36"/>
-
-              <!-- Two IFC — tallest in HK Island, distinctive stepped crown + mast -->
-              <rect x="51"  y="6"  width="10" height="58"/>
-              <rect x="52"  y="3"  width="8"  height="5"/>
-              <rect x="54"  y="0"  width="4"  height="4"/>
-
-              <!-- Exchange Square / Jardine House area -->
-              <rect x="64"  y="24" width="7"  height="40"/>
-              <rect x="73"  y="28" width="6"  height="36"/>
-
-              <!-- HSBC Main Building — distinctive horizontal bands, raised on stilts -->
-              <rect x="81"  y="30" width="10" height="34"/>
-              <rect x="80"  y="26" width="12" height="6"/>
-              <rect x="82"  y="22" width="8"  height="6"/>
-
-              <!-- Bank of China Tower — MOST ICONIC: triangular prism, diagonal facets -->
-              <rect x="96"  y="34" width="10" height="30"/>
-              <polygon points="96,36 101,8 106,36"/>
-              <rect x="99"  y="4"  width="4"  height="6"/>
-
-              <!-- Cheung Kong Center — rectangular glass tower -->
-              <rect x="109" y="18" width="9"  height="46"/>
-
-              <!-- The Center — tall, octagonal, lit at night -->
-              <rect x="121" y="22" width="8"  height="42"/>
-
-              <!-- Central Plaza (Wan Chai) — VERY DISTINCTIVE: sharp triangular spire -->
-              <rect x="133" y="26" width="8"  height="38"/>
-              <polygon points="131,28 137,2 143,28"/>
-              <rect x="136" y="0"  width="2"  height="4"/>
-
-              <!-- Convention Centre area / Wan Chai towers -->
-              <rect x="145" y="30" width="7"  height="34"/>
-              <rect x="154" y="34" width="8"  height="30"/>
-
-              <!-- Causeway Bay — gradually tapering eastward -->
-              <rect x="164" y="38" width="7"  height="26"/>
-              <rect x="173" y="42" width="6"  height="22"/>
-              <rect x="181" y="45" width="7"  height="19"/>
-              <rect x="190" y="48" width="5"  height="16"/>
-              <rect x="197" y="51" width="6"  height="13"/>
-              <rect x="205" y="54" width="5"  height="10"/>
-              <rect x="212" y="57" width="8"  height="7"/>
-            </svg>
-            <p class="hk-credit">香港 · Hong Kong</p>
+            </div>
           </div>
-        </aside>
+        </section>
 
-        <main class="layout" id="layout">
-          <section class="camera-column" id="camera-column">
+        <section class="banner card" aria-label="Hong Kong healthcare banner">
+          <img src="/static/hong-kong-banner.png" alt="Hong Kong healthcare themed banner" />
+          <div class="banner-copy">
+            <p class="eyebrow">Built for dense care environments</p>
+            <h2>Medication safety, caregiver support and human-readable robotics.</h2>
+          </div>
+        </section>
 
-            <!-- Camera 1: RealSense top camera, bird-view -->
-            <section class="panel camera-panel">
-              <div class="panel-top">
-                <div>
-                  <p class="panel-kicker">Camera 1 · Top view</p>
-                  <h2>Bird-view camera <span class="zh-cam" lang="zh-HK">鳥瞰鏡頭</span></h2>
-                </div>
-                <span class="live-badge">Live</span>
-              </div>
-              <p class="panel-note">RealSense overhead camera — hand landmarks, open/closed state, palm-up.</p>
-              <div class="camera-stage">
-                <img id="camera-frame-1" class="camera-frame" alt="Camera 1 — top view palm detection" src="/stream/palm" />
-                <div id="palm-badge" class="palm-badge" aria-live="polite"></div>
-              </div>
-            </section>
+        <section class="section" id="problem">
+          <div class="section-head">
+            <p class="eyebrow">Problem</p>
+            <h2>Medication adherence is a healthcare workflow problem, not only a reminder problem.</h2>
+            <p>
+              In Hong Kong, aging populations, caregiver workload and dense clinical operations create real pressure around
+              medication timing, verification and patient independence. Patients may forget doses, repeat doses or need help
+              understanding what they should take today.
+            </p>
+          </div>
 
-            <div class="splitter splitter-horizontal" id="camera-splitter" role="separator" aria-label="Resize camera panes" aria-orientation="horizontal" tabindex="0"></div>
+          <div class="grid grid-3">
+            <article class="card info-card">
+              <span class="card-index">01</span>
+              <h3>Adherence risk</h3>
+              <p>Missed or repeated medication events remain common when schedules are complex or supervision is limited.</p>
+            </article>
+            <article class="card info-card">
+              <span class="card-index">02</span>
+              <h3>Caregiver overload</h3>
+              <p>Staff and family carers spend time on repeated low-complexity medication support tasks that still require trust.</p>
+            </article>
+            <article class="card info-card">
+              <span class="card-index">03</span>
+              <h3>Healthcare pressure</h3>
+              <p>Hospitals, retirement homes and home-care systems need safer workflows that preserve independence and visibility.</p>
+            </article>
+          </div>
+        </section>
 
-            <!-- Camera 2: HBV HD CAMERA robot-mounted -->
-            <section class="panel camera-panel">
-              <div class="panel-top">
-                <div>
-                  <p class="panel-kicker">Camera 2 · Robot view</p>
-                  <h2>End-effector camera <span class="zh-cam" lang="zh-HK">末端鏡頭</span></h2>
-                </div>
-                <span class="live-badge">Live</span>
-              </div>
-              <p class="panel-note">HBV HD CAMERA mounted on robot arm — close-up of the workspace.</p>
-              <div class="camera-stage">
-                <img id="camera-frame-2" class="camera-frame" alt="Camera 2 — robot arm end-effector view" src="/stream/2" />
-              </div>
-            </section>
+        <section class="section" id="solution">
+          <div class="section-head">
+            <p class="eyebrow">Solution</p>
+            <h2>A visible, patient-friendly robotics workflow for medication handoff.</h2>
+            <p>
+              MediPalm AI first confirms that a patient’s palm is open and facing upward. Only then does the robotic arm
+              dispense the previously selected medication. Around that core interaction, the chatbot explains schedules,
+              verifies what has already been taken and guides the patient through each step.
+            </p>
+          </div>
 
-          </section>
+          <div class="grid grid-3">
+            <article class="card solution-card">
+              <p class="panel-label">Vision</p>
+              <h3>Open-palm detection</h3>
+              <p>Intel camera perception checks whether the patient is ready to safely receive medication.</p>
+            </article>
+            <article class="card solution-card">
+              <p class="panel-label">Robotics</p>
+              <h3>Robotic dispensing</h3>
+              <p>Two LeRobot arms support the handoff workflow and keep dispensing physically structured and repeatable.</p>
+            </article>
+            <article class="card solution-card">
+              <p class="panel-label">Conversation</p>
+              <h3>Chatbot scheduling</h3>
+              <p>Patients can ask what medication they need, whether they already took it and why they take it.</p>
+            </article>
+          </div>
+        </section>
 
-          <div class="splitter splitter-vertical" id="layout-splitter" role="separator" aria-label="Resize chat panel" aria-orientation="vertical" tabindex="0"></div>
+        <section class="section" id="features">
+          <div class="section-head">
+            <p class="eyebrow">Features</p>
+            <h2>Demo-ready capabilities for a clinical robotics workflow.</h2>
+          </div>
 
-          <section class="panel chat-panel">
-            <div class="chat-head">
-              <div>
-                <p class="panel-kicker">Chat</p>
-                <h2>Operator instructions</h2>
-                <p class="panel-note">Use short, explicit prompts. The assistant will confirm actions and log them.</p>
-              </div>
+          <div class="grid grid-3">
+            <article class="card feature-card">
+              <h3>Palm-up detection</h3>
+              <p>Medication is dispensed only after the handoff gesture is verified.</p>
+            </article>
+            <article class="card feature-card">
+              <h3>Robotic pill handoff</h3>
+              <p>Structured physical transfer from robot to patient palm.</p>
+            </article>
+            <article class="card feature-card">
+              <h3>Medication chatbot</h3>
+              <p>Natural-language answers to schedule and pill questions.</p>
+            </article>
+            <article class="card feature-card">
+              <h3>Patient camera view</h3>
+              <p>Clear live views of the robot and palm detection area.</p>
+            </article>
+            <article class="card feature-card">
+              <h3>Caregiver-ready logs</h3>
+              <p>Dispensing events, alerts and medication states remain visible.</p>
+            </article>
+            <article class="card feature-card">
+              <h3>Hong Kong healthcare focus</h3>
+              <p>Designed for eldercare, home care and medication adherence pressure in dense care systems.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="section" id="pitch">
+          <div class="pitch card">
+            <div>
+              <p class="eyebrow">Hackathon Pitch</p>
+              <h2>MediPalm AI helps patients receive the right pill at the right time with a gesture that is visible, natural and safe.</h2>
+              <p>
+                It is not a black-box robot. It is a human-readable medication workflow combining robotics, computer vision
+                and conversational AI for safer independent living in Hong Kong healthcare.
+              </p>
             </div>
-
-            <div class="robot-controls chat-robot-controls" aria-label="Robot controls">
-              <button class="robot-btn" id="btn-home"    title="Move to home pose">Home</button>
-              <button class="robot-btn" id="btn-grip"    title="Close gripper">Grip</button>
-              <button class="robot-btn" id="btn-release" title="Open gripper">Release</button>
-              <span class="robot-sep" aria-hidden="true"></span>
-              <button class="robot-btn dir-btn" id="btn-up" title="Up (Z+)">
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <line x1="8" y1="12" x2="8" y2="4"/><polyline points="4,8 8,4 12,8"/>
-                </svg>
-              </button>
-              <button class="robot-btn dir-btn" id="btn-down" title="Down (Z−)">
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <line x1="8" y1="4" x2="8" y2="12"/><polyline points="4,8 8,12 12,8"/>
-                </svg>
-              </button>
-              <button class="robot-btn dir-btn" id="btn-forward" title="Forward (X+)">
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <polyline points="3,10 8,5 13,10"/><polyline points="3,13 8,8 13,13"/>
-                </svg>
-              </button>
-              <button class="robot-btn dir-btn" id="btn-back" title="Back (X−)">
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <polyline points="3,6 8,11 13,6"/><polyline points="3,3 8,8 13,3"/>
-                </svg>
-              </button>
-              <button class="robot-btn dir-btn" id="btn-left" title="Left (Y+)">
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <line x1="12" y1="8" x2="4" y2="8"/><polyline points="8,4 4,8 8,12"/>
-                </svg>
-              </button>
-              <button class="robot-btn dir-btn" id="btn-right" title="Right (Y−)">
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <line x1="4" y1="8" x2="12" y2="8"/><polyline points="8,4 12,8 8,12"/>
-                </svg>
-              </button>
+            <div class="pitch-actions">
+              <a class="button button-primary" href="/console">Open Patient Console</a>
+              <a class="button button-ghost" href="/business">Open Business Plan</a>
             </div>
-
-            <div class="chat-tip">Try: "Give me my morning pills."</div>
-
-            <div class="quick-actions" aria-label="Suggested prompts">
-              <button type="button" class="prompt-chip" data-prompt="Sort the pills into their matching cups.">Sort pills</button>
-              <button type="button" class="prompt-chip" data-prompt="Check whether an open palm is visible.">Palm check</button>
-              <button type="button" class="prompt-chip" data-prompt="Move the robot to its home position.">Home arm</button>
-            </div>
-
-            <div id="chat-messages" class="chat-messages" aria-live="polite" aria-relevant="additions"></div>
-
-            <div class="composer-shell">
-              <form id="chat-form" class="chat-form">
-                <label class="sr-only" for="chat-input">Message</label>
-                <input id="chat-input" name="message" type="text" autocomplete="off" placeholder="Type or speak your instruction" />
-                <button type="button" id="mic-button" class="mic-button" data-state="idle" aria-label="Voice input" title="Hold to record">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
-                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                    <line x1="12" y1="19" x2="12" y2="22"/>
-                  </svg>
-                </button>
-                <button type="submit" class="send-button">Send</button>
-              </form>
-            </div>
-          </section>
-        </main>
-      </div>
+          </div>
+        </section>
+      </main>
     </div>
-
-    <!-- Mobile bottom tab bar — hidden on desktop via CSS -->
-    <nav class="mobile-tab-bar" aria-label="Navigation tabs">
-      <button class="mobile-tab-btn active" data-tab="chat" aria-pressed="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-        </svg>
-        <span>Chat</span>
-      </button>
-      <button class="mobile-tab-btn" data-tab="camera" aria-pressed="false">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-          <circle cx="12" cy="13" r="4"/>
-        </svg>
-        <span>Camera</span>
-      </button>
-      <button class="mobile-tab-btn" data-tab="status" aria-pressed="false">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
-          <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
-        </svg>
-        <span>Info</span>
-      </button>
-    </nav>
 
     <script src="/static/app.js"></script>
   </body>

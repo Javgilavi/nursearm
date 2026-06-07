@@ -47,6 +47,7 @@ from nursearm.robot.controller import RobotController
 from nursearm.types import SceneObservation
 
 AGENT_BACKEND = os.getenv("AGENT_BACKEND", "ollama").lower()  # "ollama" | "claude"
+UI_ONLY = os.getenv("NURSEARM_UI_ONLY", "0") == "1"
 
 class _NoiseFilter(logging.Filter):
     """Drop repetitive 404s from external tools polling our server."""
@@ -406,7 +407,7 @@ def _ensure_ngrok(port: int = 8000) -> str | None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global state, _ngrok_url
-    if AGENT_BACKEND != "claude":
+    if not UI_ONLY and AGENT_BACKEND != "claude":
         await asyncio.to_thread(_ensure_ollama)
     _ngrok_url = await asyncio.to_thread(_ensure_ngrok)
     if _ngrok_url:
@@ -429,6 +430,16 @@ app = FastAPI(title="NurseArm", lifespan=lifespan)
 @app.get("/")
 async def index() -> FileResponse:
     return FileResponse(WEB_DIR / "index.html")
+
+
+@app.get("/console")
+async def console() -> FileResponse:
+    return FileResponse(WEB_DIR / "console.html")
+
+
+@app.get("/business")
+async def business() -> FileResponse:
+    return FileResponse(WEB_DIR / "business.html")
 
 
 @app.get("/static/{path:path}")

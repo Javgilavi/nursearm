@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MediPalm AI · Patient Console</title>
+    <link rel="stylesheet" href="/static/console.css" />
+  </head>
+  <body>
+    <div class="dashboard-shell">
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <div class="brand-mark">M</div>
+          <div class="brand-copy">
+            <strong>MediPalm AI</strong>
+            <span>Patient medication console</span>
+          </div>
+        </div>
+
+        <nav class="sidebar-nav" aria-label="Navigation">
+          <a class="nav-item is-active" href="#dashboard">Dashboard</a>
+          <a class="nav-item" href="#medication-card">Medication</a>
+          <a class="nav-item" href="#chat-panel">Chat Assistant</a>
+          <a class="nav-item" href="/">Landing Page</a>
+          <a class="nav-item" href="/business">Business Plan</a>
+        </nav>
+
+        <div class="sidebar-note card-shell">
+          <p class="section-label">Safety</p>
+          <p>Medication is only dispensed when an open palm is detected.</p>
+        </div>
+
+        <button class="stop-button" id="emergency-stop-button" type="button">Stop</button>
+      </aside>
+
+      <main class="dashboard-main" id="dashboard">
+        <header class="dashboard-header">
+          <div>
+            <p class="section-label">Patient Dashboard</p>
+            <h1>MediPalm AI</h1>
+            <p class="dashboard-subtitle">Receive the right medication at the right time with robotics, vision and conversational guidance.</p>
+          </div>
+          <div class="status-row-top">
+            <div class="status-badge"><span class="status-dot" id="status-camera-dot"></span><span id="status-camera-text">Camera online</span></div>
+            <div class="status-badge"><span class="status-dot" id="status-palm-dot"></span><span id="status-palm-text">Palm not detected</span></div>
+            <div class="status-badge"><span class="status-dot" id="status-robot-dot"></span><span id="status-robot-text">Robot ready</span></div>
+            <div class="status-badge"><span class="status-dot" id="status-medication-dot"></span><span id="status-medication-text">Medication selected</span></div>
+          </div>
+        </header>
+
+        <div class="dashboard-grid">
+          <section class="main-column">
+            <article class="panel card-shell">
+              <div class="panel-head">
+                <div>
+                  <p class="section-label">Camera Panel</p>
+                  <h2>Robot Arm Camera View</h2>
+                </div>
+                <span class="pill" id="workspace-badge">Live</span>
+              </div>
+              <div class="camera-panel">
+                <img id="stream-workspace" src="/stream/2" alt="Robot arm camera live view" />
+              </div>
+            </article>
+
+            <article class="panel card-shell">
+              <div class="panel-head">
+                <div>
+                  <p class="section-label">Detection Panel</p>
+                  <h2>Bird-eye Intel Camera View</h2>
+                </div>
+                <span class="pill pill-success" id="palm-badge">Monitoring</span>
+              </div>
+              <div class="camera-panel">
+                <img id="stream-palm" src="/stream/palm" alt="Bird-eye Intel camera palm detection view" />
+              </div>
+            </article>
+
+            <article class="panel card-shell medication-card" id="medication-card">
+              <div class="panel-head">
+                <div>
+                  <p class="section-label">Current Medication</p>
+                  <h2 id="medication-name">Metformin</h2>
+                </div>
+                <span class="pill" id="medication-status">Scheduled</span>
+              </div>
+
+              <div class="medication-grid">
+                <div class="medication-item">
+                  <span class="meta-label">Dosage</span>
+                  <strong id="medication-dosage">500 mg</strong>
+                </div>
+                <div class="medication-item">
+                  <span class="meta-label">Time</span>
+                  <strong id="medication-time">08:00 AM</strong>
+                </div>
+                <div class="medication-item">
+                  <span class="meta-label">Status</span>
+                  <strong id="medication-detail-status">Awaiting palm detection</strong>
+                </div>
+              </div>
+
+              <div class="medication-actions">
+                <button class="button button-primary button-large" id="request-medication-button" type="button">Request Medication</button>
+              </div>
+            </article>
+          </section>
+
+          <aside class="side-column">
+            <article class="panel card-shell" id="chat-panel">
+              <div class="panel-head">
+                <div>
+                  <p class="section-label">Medication Chatbot</p>
+                  <h2>Ask MediPalm AI</h2>
+                </div>
+                <button class="button button-ghost" id="mic-button" type="button">Voice</button>
+              </div>
+
+              <div class="prompt-list">
+                <button class="prompt-chip" data-prompt="What medication do I need today?" type="button">What medication do I need today?</button>
+                <button class="prompt-chip" data-prompt="Did I already take my pill?" type="button">Did I already take my pill?</button>
+                <button class="prompt-chip" data-prompt="Give me my next medication." type="button">Give me my next medication.</button>
+                <button class="prompt-chip" data-prompt="Why do I take this medication?" type="button">Why do I take this medication?</button>
+              </div>
+
+              <div class="chat-log" id="chat-log" aria-live="polite"></div>
+
+              <form class="chat-form" id="chat-form">
+                <input id="chat-input" name="message" type="text" placeholder="Ask about today’s medication schedule..." autocomplete="off" />
+                <button class="button button-primary" id="send-button" type="submit">Send</button>
+              </form>
+            </article>
+
+            <article class="panel card-shell">
+              <div class="panel-head">
+                <div>
+                  <p class="section-label">Status</p>
+                  <h2>Medication Safety</h2>
+                </div>
+              </div>
+
+              <div class="safety-message">
+                Medication is only dispensed when an open palm is detected.
+              </div>
+
+              <div class="status-list">
+                <div class="status-line">
+                  <span>Camera</span>
+                  <strong id="scene-camera">Pending</strong>
+                </div>
+                <div class="status-line">
+                  <span>Palm state</span>
+                  <strong id="palm-open">Unknown</strong>
+                </div>
+                <div class="status-line">
+                  <span>Palm orientation</span>
+                  <strong id="palm-up">Unknown</strong>
+                </div>
+                <div class="status-line">
+                  <span>Confidence</span>
+                  <strong id="palm-confidence">0%</strong>
+                </div>
+                <div class="status-line">
+                  <span>Robot state</span>
+                  <strong id="robot-summary">Unavailable</strong>
+                </div>
+                <div class="status-line">
+                  <span>Last event</span>
+                  <strong id="last-event">Waiting</strong>
+                </div>
+              </div>
+            </article>
+          </aside>
+        </div>
+      </main>
+    </div>
+
+    <script src="/static/console.js"></script>
+  </body>
+</html>
