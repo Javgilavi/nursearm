@@ -87,6 +87,18 @@ skills:
     policy_env: NURSEARM_SORT_PILLS_POLICY
     enabled: true
 
+  sort_pills_act:
+    type: vla
+    class: nursearm.skills.sort_pills_act.SortPillsACT
+    description: >
+      Sort pills into matching cups using the Laniakea2002/act_sort ACT policy
+      (warm-start + augmentation model, 107 episodes, 30k steps). Downloads from
+      HuggingFace automatically if NURSEARM_SORT_ACT_POLICY is not set.
+      Args: {duration_s: <optional seconds>}.
+    task: "Sort two mock pills, green to green cup and black to black cup"
+    policy_env: NURSEARM_SORT_ACT_POLICY
+    enabled: true
+
   sort_pills_smolvla:
     type: vla
     class: nursearm.skills.sort_pills_smolvla.SortPillsSmolVLA

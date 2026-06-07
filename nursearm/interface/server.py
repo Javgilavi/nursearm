@@ -824,6 +824,24 @@ async def calendar_skip_event(event_id: str) -> dict[str, Any]:
     return state.scheduler.skip(event_id)
 
 
+# -- ACT sort skill (Laniakea2002/act_sort) ------------------------------------
+
+
+@app.post("/skills/sort-act")
+async def run_sort_act(request: Request) -> dict[str, Any]:
+    """Run the Laniakea2002/act_sort ACT skill directly."""
+    body = await request.json() if request.headers.get("content-length", "0") != "0" else {}
+    arguments: dict[str, Any] = {k: v for k, v in body.items() if k in ("duration_s", "task")}
+    logger.info("ACT sort started")
+    try:
+        result = await state._run_skill_with_cameras("sort_pills_act", arguments)
+    except Exception as exc:
+        logger.exception("ACT sort failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    logger.info("ACT sort completed")
+    return result
+
+
 # -- SmolVLA sort skill ---------------------------------------------------------
 
 

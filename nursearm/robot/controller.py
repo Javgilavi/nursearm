@@ -186,16 +186,19 @@ class RobotController:
         camera_arg: str | None = None,
         fps: float | None = None,
         temporal_ensemble: bool = True,
+        temporal_ensemble_coeff: float | None = None,
     ) -> None:
         """Run a full trained-skill rollout (Option B: lerobot-rollout subprocess).
 
         Frees the in-process serial connection first so lerobot-rollout can own the arm,
         then reconnects afterwards. Set temporal_ensemble=False for VLA models that don't
-        support it (e.g. SmolVLA).
+        support it (e.g. SmolVLA). Pass temporal_ensemble_coeff to override the robot
+        config value for a specific skill (e.g. ACT sort uses 0.01).
         """
         duration_s = self.rollout_duration_s if duration_s is None else duration_s
         camera_arg = self.camera_arg if camera_arg is None else camera_arg
         fps = self.fps if fps is None else fps
+        coeff = temporal_ensemble_coeff if temporal_ensemble_coeff is not None else self.temporal_ensemble_coeff
         if self.mock or not policy_path:
             logger.info("[mock] run_policy(%s, task=%r)", policy_path, task)
             return
@@ -221,11 +224,8 @@ class RobotController:
             f"--fps={fps}",
             f"--duration={duration_s}",
         ]
-        if temporal_ensemble and self.temporal_ensemble_coeff is not None:
-            cmd.insert(
-                4,
-                f"--policy.temporal_ensemble_coeff={self.temporal_ensemble_coeff}",
-            )
+        if temporal_ensemble and coeff is not None:
+            cmd.insert(4, f"--policy.temporal_ensemble_coeff={coeff}")
         logger.info("Running: %s", " ".join(cmd))
         try:
             subprocess.run(cmd, check=True)  # noqa: S603

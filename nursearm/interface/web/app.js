@@ -615,6 +615,45 @@ handoverButtons.forEach((button) => {
   });
 });
 
+// ── ACT sort button (Laniakea2002/act_sort) ────────────────────────────────────
+
+const actSortBtn = document.getElementById("btn-sort-act");
+if (actSortBtn) {
+  actSortBtn.addEventListener("click", async () => {
+    appendMessage("user", "Run ACT sort policy (Laniakea2002/act_sort).");
+    setLoading(true);
+    actSortBtn.disabled = true;
+    showActivity("Running ACT sort policy…");
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 300000);
+    try {
+      const response = await fetch("/skills/sort-act", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+        signal: controller.signal,
+      });
+      const payload = await response.json();
+      hideSpinner();
+      const note = payload.note || payload.detail || "ACT sort finished.";
+      appendMessage("assistant", response.ok ? note : `Error: ${note}`);
+    } catch (error) {
+      hideSpinner();
+      appendMessage(
+        "assistant",
+        error.name === "AbortError"
+          ? "ACT sort did not finish within 5 minutes."
+          : "Cannot reach the NurseArm backend."
+      );
+    } finally {
+      clearTimeout(timeout);
+      setLoading(false);
+      actSortBtn.disabled = false;
+    }
+  });
+}
+
 // ── SmolVLA sort button ────────────────────────────────────────────────────────
 
 const smolvlaBtn = document.getElementById("btn-sort-smolvla");
