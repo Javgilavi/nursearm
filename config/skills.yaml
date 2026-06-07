@@ -52,6 +52,19 @@ skills:
     policy_path: null   # replace with trained policy path when ready
     enabled: true
 
+  # ---- Trained ACT skills (enabled) ----------------------------------------
+  sort_pills:
+    type: vla
+    class: nursearm.skills.sort_pills.SortPills
+    description: >
+      Sort the two pills into their matching cups: the green pill into the green cup and
+      the black pill into the black cup. Runs the trained ACT pick-and-place policy
+      end-to-end from the cameras. Use when the person asks to sort, organise, or put
+      away the pills into the cups. Args: {duration_s: <optional seconds>}.
+    task: "Sort two mock pills, green to green cup and black to black cup"
+    policy_path: /home/simone/lerobot/outputs/train/act_sort/checkpoints/last/pretrained_model
+    enabled: true
+
   # Individual VLA skill stubs — disabled while the single VLA policy is in use.
   # Re-enable and set policy_path when task-specific policies are trained.
   dispense_pills:

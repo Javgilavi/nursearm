@@ -34,6 +34,11 @@ class RobotController:
         self.camera_arg = rc.get("camera_arg", "{ front: {type: opencv, index_or_path: 0, "
                                                "width: 640, height: 480, fps: 30}}")
         self.max_jump_m = rc.get("safe_stop_max_jump_m", 0.08)
+        # Policy rollout settings (must match how the policy was trained).
+        self.fps = rc.get("fps", 15)
+        self.policy_device = rc.get("policy_device", "cuda")
+        self.temporal_ensemble_coeff = rc.get("policy_temporal_ensemble_coeff", 0.01)
+        self.rollout_duration_s = rc.get("rollout_duration_s", 30)
         self._robot = None
         if not mock:
             self._connect()
@@ -70,19 +75,52 @@ class RobotController:
         # LeRobot kinematics implementation.
         raise NotImplementedError("implement Cartesian jog with LeRobot kinematics")
 
-    def run_policy(self, policy_path: str | None, task: str, target: Point3D | None = None) -> None:
-        """Run a full trained-skill rollout (Option B: lerobot-rollout subprocess)."""
+    def run_policy(
+        self,
+        policy_path: str | None,
+        task: str,
+        target: Point3D | None = None,
+        duration_s: float | None = None,
+    ) -> None:
+        """Run a full trained-skill rollout (Option B: lerobot-rollout subprocess).
+
+        Frees the in-process serial connection first so lerobot-rollout can own the arm,
+        then reconnects afterwards. Passes the ACT smoothing flag (temporal ensembling)
+        and the camera/fps config that must match how the policy was trained.
+        """
+        duration_s = self.rollout_duration_s if duration_s is None else duration_s
         if self.mock or not policy_path:
             logger.info("[mock] run_policy(%s, task=%r, target=%s)", policy_path, task, target)
             return
+
+        # lerobot-rollout opens the arm itself — release our in-process handle first,
+        # otherwise both fight for the serial port.
+        reconnect = self._robot is not None
+        if reconnect:
+            try:
+                self._robot.disconnect()
+            except Exception:
+                logger.exception("disconnect before rollout failed")
+            self._robot = None
+
         cmd = [
             "lerobot-rollout", "--strategy.type=base",
             f"--policy.path={policy_path}",
-            "--robot.type=so101_follower", f"--robot.port={self.port}", f"--robot.id={self.robot_id}",
-            f"--robot.cameras={self.camera_arg}", f"--task={task}", "--duration=30",
+            f"--policy.device={self.policy_device}",
+            f"--policy.temporal_ensemble_coeff={self.temporal_ensemble_coeff}",
+            "--robot.type=so101_follower",
+            f"--robot.port={self.port}", f"--robot.id={self.robot_id}",
+            f"--robot.cameras={self.camera_arg}",
+            f"--task={task}",
+            f"--fps={self.fps}",
+            f"--duration={duration_s}",
         ]
         logger.info("Running: %s", " ".join(cmd))
-        subprocess.run(cmd, check=True)  # noqa: S603
+        try:
+            subprocess.run(cmd, check=True)  # noqa: S603
+        finally:
+            if reconnect:
+                self._connect()
 
     def servo_to(self, point: Point3D, standoff_m: float = 0.05,
                  track: Callable[[], Point3D | None] | None = None) -> None:
