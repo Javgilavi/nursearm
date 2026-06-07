@@ -1,22 +1,14 @@
-"""Thin wrapper over LeRobot. The ONLY module that talks to the SO-101.
+"""Thin wrapper over the SO-101 robot hardware.
 
-It exposes a tiny, safe vocabulary the skills use: home(), jog(), run_policy(),
-servo_to(), grip()/release(). Everything else (the judge, skills) goes through this. Keeping the
-LeRobot surface in one place means the rest of the codebase has no hard dependency on
-LeRobot internals and can run in mock mode on a laptop.
-
-LeRobot integration choice (see README §LeRobot): we DEPEND on lerobot (installed in
-the same venv), we do not fork it. Two ways to drive the arm:
-  A. In-process: import lerobot's SO101Follower + a loaded policy and step the control
-     loop here (lowest latency, most control). Preferred for servo_to.
-  B. Subprocess: shell out to `lerobot-rollout --policy.path=... --task=...` for a full
-     trained-skill rollout. Simplest; good enough for run_policy.
+Motor positions are normalized to [-100, 100] for arm joints, [0, 100] for the gripper.
+In mock mode all operations are no-ops that log to stdout.
 """
 
 from __future__ import annotations
 
 import logging
 import subprocess
+import time
 from typing import Callable
 
 from nursearm import config
@@ -24,94 +16,146 @@ from nursearm.types import Point3D
 
 logger = logging.getLogger(__name__)
 
+# Home pose: arm upright, centred, gripper open.
+_HOME_POSE: dict[str, float] = {
+    "shoulder_pan":  0.0,
+    "shoulder_lift": 0.0,
+    "elbow_flex":    0.0,
+    "wrist_flex":    0.0,
+    "wrist_roll":    0.0,
+    "gripper":       0.0,
+}
+
+_GRIP_CLOSED = 80.0   # gripper closed (% of range)
+_GRIP_OPEN   = 0.0    # gripper fully open
+
 
 class RobotController:
     def __init__(self, mock: bool = False) -> None:
         self.mock = mock
         rc = config.robot_config()
         self.port = rc.get("follower_port", "/dev/ttyACM0")
-        self.robot_id = rc.get("follower_id", "follower")
-        self.camera_arg = rc.get("camera_arg", "{ front: {type: opencv, index_or_path: 0, "
-                                               "width: 640, height: 480, fps: 30}}")
+        self.camera_arg = rc.get("camera_arg", "")
         self.max_jump_m = rc.get("safe_stop_max_jump_m", 0.08)
-        self._robot = None
+        self._bus = None
+        self._current_pose: dict[str, float] = dict(_HOME_POSE)
         if not mock:
             self._connect()
 
+    # ── connection ────────────────────────────────────────────────────────────
+
     def _connect(self) -> None:
-        # Option A wiring (in-process). Imported lazily so mock mode needs no lerobot.
+        from nursearm.robot.motor_bus import FeetechBus  # noqa: PLC0415
+
         try:
-            from lerobot.robots.so_follower.so_follower import SO101Follower  # type: ignore
-            from lerobot.robots.so_follower.config_so_follower import SO101FollowerConfig  # type: ignore
-
-            self._robot = SO101Follower(SO101FollowerConfig(port=self.port, id=self.robot_id))
-            self._robot.connect()
-            logger.info("SO-101 follower connected on %s (id=%s).", self.port, self.robot_id)
+            bus = FeetechBus(self.port)
+            bus.connect()
+            self._bus = bus
+            logger.info("SO-101 follower connected on %s.", self.port)
         except Exception:
-            logger.exception("Could not connect SO-101 in-process; run_policy will use subprocess.")
+            logger.exception("Could not connect SO-101 on %s — running in degraded mode.", self.port)
 
-    # -- primitives skills use ---------------------------------------------------
+    # ── state reading ─────────────────────────────────────────────────────────
+
+    def get_state(self) -> dict[str, float]:
+        """Return current motor positions (normalized).  Falls back to last known on error."""
+        if self.mock or self._bus is None:
+            return dict(self._current_pose)
+        try:
+            import math  # noqa: PLC0415
+
+            positions = self._bus.read_positions()
+            for k, v in positions.items():
+                if not math.isnan(v):
+                    self._current_pose[k] = v
+            return dict(self._current_pose)
+        except Exception as exc:
+            logger.warning("get_state failed: %s", exc)
+            return dict(self._current_pose)
+
+    # ── primitive skills ──────────────────────────────────────────────────────
+
     def home(self) -> None:
-        """Move to a safe home pose. Called between attempts and on abort."""
+        """Move all joints to the neutral home pose."""
         if self.mock:
             logger.info("[mock] home()")
+            self._current_pose = dict(_HOME_POSE)
             return
-        # TODO: send the configured home joint pose via self._robot.send_action(...).
-        raise NotImplementedError("set home pose in config/robot.yaml and implement send_action")
+        if self._bus is None:
+            logger.warning("home(): not connected")
+            return
+        self._bus.write_positions(_HOME_POSE)
+        time.sleep(0.5)
+        self._current_pose = dict(_HOME_POSE)
+        logger.info("home() done.")
 
-    def jog(self, axis: str, distance_m: float) -> None:
-        """Move the end effector by a fixed Cartesian offset."""
-        if axis not in {"x", "y", "z"}:
-            raise ValueError(f"unsupported jog axis: {axis}")
+    def grip(self) -> None:
+        """Close the gripper."""
         if self.mock:
-            logger.info("[mock] jog(axis=%s, distance_m=%.3f)", axis, distance_m)
+            logger.info("[mock] grip()")
+            self._current_pose["gripper"] = _GRIP_CLOSED
             return
-        # TODO: convert the Cartesian offset to a joint command with the selected
-        # LeRobot kinematics implementation.
-        raise NotImplementedError("implement Cartesian jog with LeRobot kinematics")
+        if self._bus is None:
+            return
+        self._bus.write_positions({"gripper": _GRIP_CLOSED})
+        self._current_pose["gripper"] = _GRIP_CLOSED
+
+    def release(self) -> None:
+        """Open the gripper fully."""
+        if self.mock:
+            logger.info("[mock] release()")
+            self._current_pose["gripper"] = _GRIP_OPEN
+            return
+        if self._bus is None:
+            return
+        self._bus.write_positions({"gripper": _GRIP_OPEN})
+        self._current_pose["gripper"] = _GRIP_OPEN
+
+    def jog(self, joint: str, delta: float) -> None:
+        """Move a single joint by `delta` normalized units.
+
+        Valid joint names: shoulder_pan, shoulder_lift, elbow_flex,
+                           wrist_flex, wrist_roll, gripper.
+        """
+        from nursearm.robot.motor_bus import MOTOR_NAMES  # noqa: PLC0415
+
+        if joint not in MOTOR_NAMES:
+            raise ValueError(f"Unknown joint: {joint!r}. Valid: {MOTOR_NAMES}")
+        if self.mock:
+            logger.info("[mock] jog(joint=%s, delta=%.1f)", joint, delta)
+            lo, hi = (0.0, 100.0) if joint == "gripper" else (-100.0, 100.0)
+            self._current_pose[joint] = max(lo, min(hi, self._current_pose.get(joint, 0.0) + delta))
+            return
+        if self._bus is None:
+            return
+        current = self.get_state()
+        lo, hi = (0.0, 100.0) if joint == "gripper" else (-100.0, 100.0)
+        target = max(lo, min(hi, current.get(joint, 0.0) + delta))
+        self._bus.write_positions({joint: target})
+        self._current_pose[joint] = target
 
     def run_policy(self, policy_path: str | None, task: str, target: Point3D | None = None) -> None:
-        """Run a full trained-skill rollout (Option B: lerobot-rollout subprocess)."""
+        """Run a trained-skill rollout via lerobot-rollout subprocess."""
         if self.mock or not policy_path:
             logger.info("[mock] run_policy(%s, task=%r, target=%s)", policy_path, task, target)
             return
         cmd = [
             "lerobot-rollout", "--strategy.type=base",
             f"--policy.path={policy_path}",
-            "--robot.type=so101_follower", f"--robot.port={self.port}", f"--robot.id={self.robot_id}",
-            f"--robot.cameras={self.camera_arg}", f"--task={task}", "--duration=30",
+            "--robot.type=so101_follower", f"--robot.port={self.port}",
+            f"--task={task}", "--duration=30",
         ]
         logger.info("Running: %s", " ".join(cmd))
         subprocess.run(cmd, check=True)  # noqa: S603
 
     def servo_to(self, point: Point3D, standoff_m: float = 0.05,
                  track: Callable[[], Point3D | None] | None = None) -> None:
-        """Move the end-effector toward `point`, stopping `standoff_m` short.
-
-        SAFE-STOP: if a `track` callback is given, re-read the target each step; if it
-        jumps more than `max_jump_m`, halt immediately (person moved). This is the
-        hard safety guard for feed_person and hand_handoff.
-        """
         if self.mock:
             logger.info("[mock] servo_to(%s, standoff=%.3f)", point, standoff_m)
             return
-        # TODO: implement a small IK/Jacobian servo loop using lerobot's kinematics
-        #       (see src/lerobot/robots/so_follower/robot_kinematic_processor.py).
-        #       Each step: read track() -> if |new - last| > self.max_jump_m: STOP.
-        raise NotImplementedError("implement servo loop with safe-stop guard")
-
-    def grip(self) -> None:
-        if self.mock:
-            logger.info("[mock] grip()")
-            return
-        raise NotImplementedError
-
-    def release(self) -> None:
-        if self.mock:
-            logger.info("[mock] release()")
-            return
-        raise NotImplementedError
+        raise NotImplementedError("servo_to requires IK — not yet implemented.")
 
     def disconnect(self) -> None:
-        if self._robot is not None:
-            self._robot.disconnect()
+        if self._bus is not None:
+            self._bus.disconnect()
+            self._bus = None

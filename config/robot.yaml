@@ -1,8 +1,8 @@
 # SO-101 + camera configuration. Fill in after calibration (scripts/calibrate.py).
 
 # Serial ports (find with `lerobot-find-port`, one arm at a time)
-follower_port: /dev/ttyACM0
-leader_port: /dev/ttyACM1
+follower_port: /dev/ttyACM1
+leader_port: /dev/ttyACM0
 
 # Calibration ids (set during `lerobot-calibrate ... --robot.id=...`) — reuse everywhere
 follower_id: follower

@@ -124,6 +124,25 @@
               </div>
             </section>
 
+            <div class="splitter splitter-horizontal" id="robot-splitter" role="separator" aria-label="Resize robot panel" aria-orientation="horizontal" tabindex="0"></div>
+
+            <!-- Motor graph + primitive controls -->
+            <section class="panel robot-panel" id="robot-panel">
+              <div class="panel-top">
+                <div>
+                  <p class="panel-kicker">SO-101 Follower · Motors</p>
+                  <h2>Joint positions</h2>
+                </div>
+                <div class="robot-controls" aria-label="Primitive skills">
+                  <button class="robot-btn" id="btn-home" title="Move to home pose">Home</button>
+                  <button class="robot-btn" id="btn-grip" title="Close gripper">Grip</button>
+                  <button class="robot-btn" id="btn-release" title="Open gripper">Release</button>
+                </div>
+              </div>
+              <canvas id="motor-graph" class="motor-graph" aria-label="Motor position history"></canvas>
+              <div class="motor-legend" id="motor-legend" aria-hidden="true"></div>
+            </section>
+
           </section>
 
           <div class="splitter splitter-vertical" id="layout-splitter" role="separator" aria-label="Resize chat panel" aria-orientation="vertical" tabindex="0"></div>

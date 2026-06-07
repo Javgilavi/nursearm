@@ -22,7 +22,8 @@
   --radius-md: 16px;
   --splitter-size: 12px;
   --layout-left: 60%;
-  --layout-top: 50%;
+  --layout-top: 33%;
+  --layout-mid: 33%;
 }
 
 * {
@@ -275,7 +276,7 @@ h1 {
 .camera-column {
   min-height: 0;
   display: grid;
-  grid-template-rows: minmax(260px, var(--layout-top)) var(--splitter-size) minmax(260px, 1fr);
+  grid-template-rows: minmax(200px, var(--layout-top)) var(--splitter-size) minmax(200px, var(--layout-mid)) var(--splitter-size) minmax(160px, 1fr);
 }
 
 .panel {
@@ -695,6 +696,84 @@ body.is-resizing-horizontal * {
   border: 0;
 }
 
+/* ── Robot panel ────────────────────────────────────────────────────────────── */
+
+.robot-panel {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 20px 12px;
+  min-height: 0;
+}
+
+.robot-controls {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.robot-btn {
+  border: 1px solid rgba(28, 18, 8, 0.14);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: rgba(255, 249, 241, 0.88);
+  color: var(--muted-strong);
+  transition: transform 150ms ease, border-color 150ms ease, background 150ms ease;
+}
+
+.robot-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(193, 39, 45, 0.28);
+  background: rgba(255, 249, 241, 0.98);
+}
+
+.robot-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.robot-btn.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 4px 12px rgba(139, 26, 30, 0.28);
+}
+
+.motor-graph {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: block;
+  border-radius: 14px;
+  background: rgba(28, 18, 8, 0.04);
+  margin-top: 8px;
+}
+
+.motor-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+
+.motor-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-family: ui-monospace, "Cascadia Code", "SF Mono", monospace;
+  color: var(--muted-strong);
+}
+
+.motor-legend-swatch {
+  width: 16px;
+  height: 3px;
+  border-radius: 999px;
+}
+
 /* ── Tablet (≤ 1180px) — single column, scrollable ──────────────────────────── */
 
 @media (max-width: 1180px) {
@@ -739,6 +818,10 @@ body.is-resizing-horizontal * {
 
   .camera-panel {
     min-height: 340px;
+  }
+
+  .robot-panel {
+    min-height: 220px;
   }
 
   .chat-panel {

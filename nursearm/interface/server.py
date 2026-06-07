@@ -91,9 +91,11 @@ class AppState:
         self._latest_palm_jpg: bytes = self._encode_jpg(_BLANK_FRAME)
         self._latest_cam2_jpg: bytes = self._encode_jpg(_BLANK_FRAME)
         self._latest_palm_result: dict = {"detected": False}
+        self._latest_robot_state: dict = {}
         self._palm_log_tick: int = 0
         self._camera_task: asyncio.Task | None = None
         self._cam2_task: asyncio.Task | None = None
+        self._robot_task: asyncio.Task | None = None
         self._cam2_capture: cv2.VideoCapture | None = None
         self._whisper: WhisperModel | None = None
         self._whisper_lock = asyncio.Lock()
@@ -109,6 +111,7 @@ class AppState:
             logger.info("Agent backend: Ollama")
         self._camera_task = asyncio.create_task(self._camera_loop())
         self._cam2_task = asyncio.create_task(self._camera2_loop())
+        self._robot_task = asyncio.create_task(self._robot_poll_loop())
         asyncio.create_task(self._preload_whisper())
 
     async def close(self) -> None:
@@ -116,6 +119,8 @@ class AppState:
             self._camera_task.cancel()
         if self._cam2_task is not None:
             self._cam2_task.cancel()
+        if self._robot_task is not None:
+            self._robot_task.cancel()
         if self._cam2_capture is not None:
             self._cam2_capture.release()
             self._cam2_capture = None
@@ -180,6 +185,16 @@ class AppState:
             except Exception as exc:
                 logger.debug("camera2 capture error: %s", exc)
             await asyncio.sleep(1 / 30)
+
+    async def _robot_poll_loop(self) -> None:
+        """Read motor positions at ~10 Hz and cache them for the /robot/state endpoint."""
+        while True:
+            try:
+                positions = await asyncio.to_thread(self.robot.get_state)
+                self._latest_robot_state = positions
+            except Exception as exc:
+                logger.debug("robot poll error: %s", exc)
+            await asyncio.sleep(0.1)  # 10 Hz
 
     def _capture_cam2_jpg(self) -> bytes:
         if self._cam2_capture is None or not self._cam2_capture.isOpened():
@@ -294,7 +309,7 @@ class AppState:
         return {
             "ok": True,
             "mock": MOCK,
-            "robot_connected": self.robot.mock or bool(getattr(self.robot, "_robot", None)),
+            "robot_connected": self.robot.mock or bool(getattr(self.robot, "_bus", None)),
             "camera_connected": scene.get("ok", False),
             "skills": [
                 {"name": info.name, "description": info.description, "kind": info.kind}
@@ -560,6 +575,39 @@ async def audit_ws(ws: WebSocket) -> None:
         pass
     finally:
         state._ws_clients.discard(ws)
+
+
+@app.get("/robot/state")
+async def robot_state_view() -> dict[str, Any]:
+    """Current motor positions (normalized). Polled by the UI motor graph."""
+    return {"ok": True, "positions": state._latest_robot_state}
+
+
+class RobotAction(BaseModel):
+    action: str   # "home" | "grip" | "release" | "jog"
+    joint: str | None = None
+    delta: float | None = None
+
+
+@app.post("/robot/action")
+async def robot_action(cmd: RobotAction) -> dict[str, Any]:
+    """Execute a primitive robot movement."""
+    try:
+        if cmd.action == "home":
+            await asyncio.to_thread(state.robot.home)
+        elif cmd.action == "grip":
+            await asyncio.to_thread(state.robot.grip)
+        elif cmd.action == "release":
+            await asyncio.to_thread(state.robot.release)
+        elif cmd.action == "jog":
+            if cmd.joint is None or cmd.delta is None:
+                raise HTTPException(status_code=400, detail="jog requires 'joint' and 'delta'")
+            await asyncio.to_thread(state.robot.jog, cmd.joint, cmd.delta)
+        else:
+            raise HTTPException(status_code=400, detail=f"Unknown action: {cmd.action!r}")
+    except (ValueError, NotImplementedError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "action": cmd.action}
 
 
 def main() -> None:
