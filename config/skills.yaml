@@ -87,6 +87,18 @@ skills:
     policy_env: NURSEARM_SORT_PILLS_POLICY
     enabled: true
 
+  sort_pills_smolvla:
+    type: vla
+    class: nursearm.skills.sort_pills_smolvla.SortPillsSmolVLA
+    description: >
+      Use the SmolVLA vision-language-action model to classify and sort pills into their
+      matching containers. Downloads the checkpoint from HuggingFace automatically if
+      NURSEARM_SORT_SMOLVLA_POLICY is not set to a local directory.
+      Args: {task: <optional override>, duration_s: <optional seconds>}.
+    task: "Sort the pills into the matching containers"
+    policy_env: NURSEARM_SORT_SMOLVLA_POLICY
+    enabled: true
+
   handover_pill:
     type: vla
     class: nursearm.skills.handover_pill.HandoverPill

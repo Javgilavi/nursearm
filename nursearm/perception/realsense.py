@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from dataclasses import dataclass
 
 import cv2
@@ -40,6 +41,8 @@ class Perception:
         self.mock = mock
         self.source = os.getenv("NURSEARM_CAMERA_SOURCE", "realsense").strip().lower()
         self.webcam_index = int(os.getenv("NURSEARM_WEBCAM_INDEX", "0"))
+        self._paused = False           # set True to block frames() from touching hardware
+        self._lock = threading.Lock()  # guards VideoCapture/pipeline against concurrent release
         self._pipeline = None
         self._align = None
         self._intrinsics = None
@@ -93,31 +96,48 @@ class Perception:
         return self._pipeline is not None
 
     # -- raw capture -------------------------------------------------------------
+    def pause(self) -> None:
+        """Block frames() from touching camera hardware (call before handing device to a subprocess)."""
+        self._paused = True
+
+    def resume(self) -> None:
+        """Re-enable frame capture after the subprocess has released the device."""
+        self._paused = False
+
     def frames(self) -> tuple[np.ndarray, np.ndarray]:
         """Return (color_bgr, depth_m) with depth aligned to color."""
-        if self.mock:
-            if self._video_capture is not None and self._video_capture.isOpened():
-                ok, frame = self._video_capture.read()
-                if ok:
-                    return frame, np.zeros((frame.shape[0], frame.shape[1]), np.float32)
-            return np.zeros((480, 640, 3), np.uint8), np.zeros((480, 640), np.float32)
+        _blank: tuple[np.ndarray, np.ndarray] = (
+            np.zeros((480, 640, 3), np.uint8),
+            np.zeros((480, 640), np.float32),
+        )
+        if self._paused:
+            return _blank
+        with self._lock:
+            if self._paused:   # re-check: may have been set while we waited for the lock
+                return _blank
+            if self.mock:
+                if self._video_capture is not None and self._video_capture.isOpened():
+                    ok, frame = self._video_capture.read()
+                    if ok:
+                        return frame, np.zeros((frame.shape[0], frame.shape[1]), np.float32)
+                return np.zeros((480, 640, 3), np.uint8), np.zeros((480, 640), np.float32)
 
-        if self.source == "webcam":
-            if self._video_capture is None:
-                self._start_webcam(allow_failure=False)
-            assert self._video_capture is not None
-            ok, color = self._video_capture.read()
-            if not ok or color is None:
-                raise RuntimeError(f"failed to read webcam frame from index {self.webcam_index}")
-            depth = np.zeros(color.shape[:2], np.float32)
+            if self.source == "webcam":
+                if self._video_capture is None:
+                    self._start_webcam(allow_failure=False)
+                assert self._video_capture is not None
+                ok, color = self._video_capture.read()
+                if not ok or color is None:
+                    raise RuntimeError(f"failed to read webcam frame from index {self.webcam_index}")
+                depth = np.zeros(color.shape[:2], np.float32)
+                return color, depth
+
+            import pyrealsense2 as rs  # noqa: F401
+
+            frames = self._align.process(self._pipeline.wait_for_frames())
+            color = np.asanyarray(frames.get_color_frame().get_data())
+            depth = np.asanyarray(frames.get_depth_frame().get_data()).astype(np.float32) * 0.001
             return color, depth
-
-        import pyrealsense2 as rs  # noqa: F401
-
-        frames = self._align.process(self._pipeline.wait_for_frames())
-        color = np.asanyarray(frames.get_color_frame().get_data())
-        depth = np.asanyarray(frames.get_depth_frame().get_data()).astype(np.float32) * 0.001
-        return color, depth
 
     def deproject(self, pixel: tuple[int, int], depth_m: float) -> Point3D:
         """Pixel + depth -> 3D point in CAMERA frame, then transform to BASE frame."""
@@ -149,9 +169,11 @@ class Perception:
         return hands_mod.detect(self)
 
     def close(self) -> None:
-        if self._pipeline is not None:
-            self._pipeline.stop()
-        if self._video_capture is not None:
-            self._video_capture.release()
-            self._video_capture = None
-            self._video_capture_mode = None
+        with self._lock:
+            if self._pipeline is not None:
+                self._pipeline.stop()
+                self._pipeline = None
+            if self._video_capture is not None:
+                self._video_capture.release()
+                self._video_capture = None
+                self._video_capture_mode = None

@@ -615,6 +615,45 @@ handoverButtons.forEach((button) => {
   });
 });
 
+// ── SmolVLA sort button ────────────────────────────────────────────────────────
+
+const smolvlaBtn = document.getElementById("btn-sort-smolvla");
+if (smolvlaBtn) {
+  smolvlaBtn.addEventListener("click", async () => {
+    appendMessage("user", "Run SmolVLA pill classification and sort.");
+    setLoading(true);
+    smolvlaBtn.disabled = true;
+    showActivity("Running SmolVLA sort policy…");
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 300000); // 5 min — model may need to download
+    try {
+      const response = await fetch("/skills/sort-smolvla", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+        signal: controller.signal,
+      });
+      const payload = await response.json();
+      hideSpinner();
+      const note = payload.note || payload.detail || "SmolVLA sort finished.";
+      appendMessage("assistant", response.ok ? note : `Error: ${note}`);
+    } catch (error) {
+      hideSpinner();
+      appendMessage(
+        "assistant",
+        error.name === "AbortError"
+          ? "SmolVLA sort did not finish within 5 minutes."
+          : "Cannot reach the NurseArm backend."
+      );
+    } finally {
+      clearTimeout(timeout);
+      setLoading(false);
+      smolvlaBtn.disabled = false;
+    }
+  });
+}
+
 // ── Mobile tabs ───────────────────────────────────────────────────────────────
 
 const mobileTabBtns = document.querySelectorAll(".mobile-tab-btn");

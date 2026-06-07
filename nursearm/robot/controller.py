@@ -185,12 +185,13 @@ class RobotController:
         duration_s: float | None = None,
         camera_arg: str | None = None,
         fps: float | None = None,
+        temporal_ensemble: bool = True,
     ) -> None:
         """Run a full trained-skill rollout (Option B: lerobot-rollout subprocess).
 
         Frees the in-process serial connection first so lerobot-rollout can own the arm,
-        then reconnects afterwards. Passes the camera/fps config and only enables
-        temporal ensembling when explicitly configured for a compatible checkpoint.
+        then reconnects afterwards. Set temporal_ensemble=False for VLA models that don't
+        support it (e.g. SmolVLA).
         """
         duration_s = self.rollout_duration_s if duration_s is None else duration_s
         camera_arg = self.camera_arg if camera_arg is None else camera_arg
@@ -220,7 +221,7 @@ class RobotController:
             f"--fps={fps}",
             f"--duration={duration_s}",
         ]
-        if self.temporal_ensemble_coeff is not None:
+        if temporal_ensemble and self.temporal_ensemble_coeff is not None:
             cmd.insert(
                 4,
                 f"--policy.temporal_ensemble_coeff={self.temporal_ensemble_coeff}",

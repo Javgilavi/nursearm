@@ -820,6 +820,32 @@ h1 {
   line-height: 1.45;
 }
 
+/* ── Rail page navigation ───────────────────────────────────────────────────── */
+
+.rail-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rail-nav-link {
+  display: block;
+  padding: 9px 12px;
+  border-radius: 12px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--muted-strong);
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+
+.rail-nav-link:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: rgba(193, 39, 45, 0.14);
+}
+
 /* ── HK skyline decoration ──────────────────────────────────────────────────── */
 
 .hk-skyline {
@@ -1075,6 +1101,13 @@ h2 {
   border-color: rgba(193, 39, 45, 0.24);
   background: var(--accent-soft);
   color: var(--accent-deep);
+}
+
+.smolvla-chip {
+  border-color: rgba(55, 120, 210, 0.28);
+  background: rgba(55, 120, 210, 0.08);
+  color: #2a5fa8;
+  font-weight: 700;
 }
 
 .chat-messages {

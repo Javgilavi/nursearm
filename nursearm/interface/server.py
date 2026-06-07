@@ -1,14 +1,18 @@
 """FastAPI backend for the NurseArm operator UI.
 
 Endpoints:
-  GET  /                -> the web UI
-  GET  /static/{path}   -> static files (app.js, styles.css)
+  GET  /                -> operator console (3D twin, motor graph, MCP chat, controls)
+  GET  /console         -> patient console (palm detection, medication dispensing)
+  GET  /business        -> business plan page
+  GET  /landing         -> marketing landing page
+  GET  /static/{path}   -> static files (app.js, styles.css, console.css, console.js)
   GET  /state           -> current status + scene summary
   GET  /scene           -> current RGB-D scene summary
   GET  /stream          -> MJPEG live camera stream (browser-native, no JS polling)
   GET  /frame           -> single latest JPEG frame
   POST /chat            -> {"text": ...}; runs local Ollama agent via MCP, returns reply
   POST /transcribe      -> audio file upload; returns {"text": ...} via Faster-Whisper
+  POST /skills/handover-pill -> {"color": "green"|"black"}; run handover skill directly
   WS   /audit           -> streams audit events live
   GET  /health          -> liveness + Ollama model status
 
@@ -23,6 +27,7 @@ import logging
 import os
 import subprocess
 import tempfile
+import threading
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -130,6 +135,7 @@ class AppState:
         self._cam2_task: asyncio.Task | None = None
         self._robot_task: asyncio.Task | None = None
         self._cam2_capture: cv2.VideoCapture | None = None
+        self._cam2_lock = threading.Lock()  # guards cam2 VideoCapture from concurrent release
         self._whisper: WhisperModel | None = None
         self._whisper_lock = asyncio.Lock()
         self.audit.subscribe(self._broadcast)
@@ -301,12 +307,20 @@ class AppState:
             await asyncio.sleep(0.1)  # 10 Hz
 
     def _capture_cam2_jpg(self) -> bytes:
-        if self._cam2_capture is None or not self._cam2_capture.isOpened():
-            return self._encode_jpg(_BLANK_FRAME)
-        ok, frame = self._cam2_capture.read()
-        if not ok or frame is None or frame.size == 0:
-            return self._encode_jpg(_BLANK_FRAME)
-        return self._encode_jpg(frame)
+        with self._cam2_lock:
+            if self._cam2_capture is None or not self._cam2_capture.isOpened():
+                return self._encode_jpg(_BLANK_FRAME)
+            ok, frame = self._cam2_capture.read()
+            if not ok or frame is None or frame.size == 0:
+                return self._encode_jpg(_BLANK_FRAME)
+            return self._encode_jpg(frame)
+
+    def _release_cam2(self) -> None:
+        """Release the cam2 VideoCapture under its lock (blocks until any active read finishes)."""
+        with self._cam2_lock:
+            if self._cam2_capture is not None:
+                self._cam2_capture.release()
+                self._cam2_capture = None
 
     def _draw_palm(self, color: np.ndarray, depth: np.ndarray) -> np.ndarray:
         """Run palm detection, log result every ~2 s, return annotated frame."""
@@ -554,6 +568,21 @@ async def index() -> FileResponse:
     return FileResponse(WEB_DIR / "index.html")
 
 
+@app.get("/console")
+async def console_page() -> FileResponse:
+    return FileResponse(WEB_DIR / "console.html")
+
+
+@app.get("/business")
+async def business_page() -> FileResponse:
+    return FileResponse(WEB_DIR / "business.html")
+
+
+@app.get("/landing")
+async def landing_page() -> FileResponse:
+    return FileResponse(WEB_DIR / "landing.html")
+
+
 @app.get("/static/{path:path}")
 async def static_file(path: str) -> FileResponse:
     return FileResponse(WEB_DIR / path)
@@ -793,6 +822,32 @@ async def calendar_fire_event(event_id: str) -> dict[str, Any]:
 async def calendar_skip_event(event_id: str) -> dict[str, Any]:
     """Dismiss a due/pending pill so it never fires (the banner's "Skip")."""
     return state.scheduler.skip(event_id)
+
+
+# -- SmolVLA sort skill ---------------------------------------------------------
+
+
+class SortSmolVLARequest(BaseModel):
+    duration_s: float | None = None
+    task: str | None = None
+
+
+@app.post("/skills/sort-smolvla")
+async def run_sort_smolvla(request: SortSmolVLARequest) -> dict[str, Any]:
+    """Run the SmolVLA pill-sorting skill directly, without asking the LLM."""
+    arguments: dict[str, Any] = {}
+    if request.duration_s is not None:
+        arguments["duration_s"] = request.duration_s
+    if request.task is not None:
+        arguments["task"] = request.task
+    logger.info("SmolVLA sort started")
+    try:
+        result = await state._run_skill_with_cameras("sort_pills_smolvla", arguments)
+    except Exception as exc:
+        logger.exception("SmolVLA sort failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    logger.info("SmolVLA sort completed")
+    return result
 
 
 @app.websocket("/audit")

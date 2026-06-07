@@ -136,6 +136,12 @@
             <div class="motor-legend" id="motor-legend" aria-hidden="true"></div>
           </section>
 
+          <nav class="rail-nav" aria-label="Pages">
+            <a class="rail-nav-link" href="/console">Patient Console</a>
+            <a class="rail-nav-link" href="/landing">Landing Page</a>
+            <a class="rail-nav-link" href="/business">Business Plan</a>
+          </nav>
+
           <section id="remote-access" class="rail-remote" hidden>
             <p class="rail-foot-label">Remote access</p>
             <img id="qr-image" class="qr-image" alt="Scan to connect" />
@@ -310,6 +316,7 @@
               <button type="button" class="prompt-chip" data-prompt="Sort the pills into their matching cups.">Sort pills</button>
               <button type="button" class="prompt-chip act-skill-chip" data-handover-color="green">Green pill</button>
               <button type="button" class="prompt-chip act-skill-chip" data-handover-color="black">Black pill</button>
+              <button type="button" class="prompt-chip smolvla-chip" id="btn-sort-smolvla" title="Run SmolVLA pill classification policy">SmolVLA Sort</button>
             </div>
 
             <div id="chat-messages" class="chat-messages" aria-live="polite" aria-relevant="additions"></div>
