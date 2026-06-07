@@ -75,6 +75,12 @@ class RobotController:
 
     # ── primitive skills ──────────────────────────────────────────────────────
 
+    def _move_then_relax(self, positions: dict[str, float], settle_s: float = 0.8) -> None:
+        """Write goal positions, wait for motion to settle, then disable torque."""
+        self._bus.write_positions(positions)
+        time.sleep(settle_s)
+        self._bus.set_torque(False)
+
     def home(self) -> None:
         """Move all joints to the neutral home pose."""
         if self.mock:
@@ -84,10 +90,9 @@ class RobotController:
         if self._bus is None:
             logger.warning("home(): not connected")
             return
-        self._bus.write_positions(_HOME_POSE)
-        time.sleep(0.5)
+        self._move_then_relax(_HOME_POSE, settle_s=1.2)
         self._current_pose = dict(_HOME_POSE)
-        logger.info("home() done.")
+        logger.info("home() done — torque off.")
 
     def grip(self) -> None:
         """Close the gripper."""
@@ -97,7 +102,7 @@ class RobotController:
             return
         if self._bus is None:
             return
-        self._bus.write_positions({"gripper": _GRIP_CLOSED})
+        self._move_then_relax({"gripper": _GRIP_CLOSED}, settle_s=0.6)
         self._current_pose["gripper"] = _GRIP_CLOSED
 
     def release(self) -> None:
@@ -108,7 +113,7 @@ class RobotController:
             return
         if self._bus is None:
             return
-        self._bus.write_positions({"gripper": _GRIP_OPEN})
+        self._move_then_relax({"gripper": _GRIP_OPEN}, settle_s=0.6)
         self._current_pose["gripper"] = _GRIP_OPEN
 
     def jog(self, joint: str, delta: float) -> None:
@@ -131,7 +136,7 @@ class RobotController:
         current = self.get_state()
         lo, hi = (0.0, 100.0) if joint == "gripper" else (-100.0, 100.0)
         target = max(lo, min(hi, current.get(joint, 0.0) + delta))
-        self._bus.write_positions({joint: target})
+        self._move_then_relax({joint: target}, settle_s=0.6)
         self._current_pose[joint] = target
 
     def run_policy(self, policy_path: str | None, task: str, target: Point3D | None = None) -> None:
