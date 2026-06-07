@@ -44,8 +44,10 @@ class Runtime:
         if self._calendar is None:
             from nursearm.config import calendar_config
             from nursearm.integrations.google_calendar import build_client
+            calendar_real = os.getenv("NURSEARM_CALENDAR_REAL", "0") == "1"
             self._calendar = build_client(
-                mock=self.mock, calendar_id=calendar_config().get("calendar_id", "primary")
+                mock=self.mock and not calendar_real,
+                calendar_id=calendar_config().get("calendar_id", "primary"),
             )
         return self._calendar
 

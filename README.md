@@ -364,9 +364,26 @@ reads **Demo**.
    uv run nursearm-calendar-auth
    ```
 
-4. Restart `nursearm-serve`. The connection chip now reads **Connected**.
+4. Start the server with the real calendar. To test against your live Google Calendar
+   **without** any robot or camera hardware, keep the robot mocked and force the real
+   calendar backend:
+
+   ```bash
+   NURSEARM_MOCK=1 NURSEARM_CALENDAR_REAL=1 uv run nursearm-serve
+   ```
+
+   (On a full hardware deployment, `NURSEARM_MOCK=0` already uses the real calendar.) The
+   connection chip now reads **Connected**.
+
+5. In Google Calendar, create an event that matches a trigger — title it `green`/`black`/`sort`,
+   or colour it (Basil/Sage = green, Graphite = black) — at a time a few minutes out. It
+   appears in the card and fires at its start time (in mock-robot mode the "give" runs the
+   in-memory skill, so you see the full due → banner → done flow with no hardware).
 
 `credentials.json` and `token.json` are secrets. They are git-ignored — never commit them.
+
+> `NURSEARM_CALENDAR_REAL=1` forces the real Google client even while `NURSEARM_MOCK=1`
+> keeps the robot/cameras mocked — handy for testing or demoing the schedule on a laptop.
 
 ### Control It Through The Agent
 

@@ -76,6 +76,9 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 MOCK = os.getenv("NURSEARM_MOCK", "0") == "1"
+# Use the real Google Calendar even while the robot is mocked, so the schedule can be
+# tested against a live calendar without any hardware attached.
+CALENDAR_REAL = os.getenv("NURSEARM_CALENDAR_REAL", "0") == "1"
 WHISPER_MODEL = os.getenv("WHISPER_MODEL", "small")
 WEB_DIR = Path(__file__).resolve().parent / "web"
 DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
@@ -102,7 +105,8 @@ class AppState:
         # medication scheduler never stacks a rollout on top of a live one.
         self._robot_lock = asyncio.Lock()
         self.calendar = build_client(
-            mock=MOCK, calendar_id=calendar_config().get("calendar_id", "primary")
+            mock=MOCK and not CALENDAR_REAL,
+            calendar_id=calendar_config().get("calendar_id", "primary"),
         )
         self.scheduler = PillScheduler(
             calendar=self.calendar,

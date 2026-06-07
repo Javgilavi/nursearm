@@ -20,9 +20,10 @@ from nursearm.interface import server
 @pytest.fixture
 def app_state(tmp_path, monkeypatch):
     monkeypatch.setattr(server, "MOCK", True)
+    # Redirect persistence to a tmp dir BEFORE constructing AppState, so the scheduler
+    # starts from clean state instead of loading the repo's data/calendar_state.json.
+    monkeypatch.setattr(server, "DATA_DIR", tmp_path)
     state = server.AppState()
-    # Redirect side effects away from the repo and stub out the rollout runner.
-    state.scheduler._state_path = tmp_path / "calendar_state.json"
     state.scheduler._audit = None
     runs: list[tuple[str, dict]] = []
 
