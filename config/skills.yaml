@@ -89,6 +89,19 @@ skills:
     policy_path: null
     enabled: true
 
+  # ---- Trained ACT skills (enabled) ----------------------------------------
+  sort_pills:
+    type: vla
+    class: nursearm.skills.sort_pills.SortPills
+    description: >
+      Sort the two pills into their matching cups: the green pill into the green cup and
+      the black pill into the black cup. Runs the trained ACT pick-and-place policy
+      end-to-end from the cameras. Use when the person asks to sort, organise, or put
+      away the pills into the cups. Args: {duration_s: <optional seconds>}.
+    task: "Sort two mock pills, green to green cup and black to black cup"
+    policy_path: /home/simone/lerobot/outputs/train/act_sort/checkpoints/last/pretrained_model
+    enabled: true
+
 # Used by integrations.calendar.MockCalendarClient when USE_GOOGLE_CALENDAR != 1.
 mock_medication_schedule:
   - {name: Aspirin,   dose: 100mg,  time: "09:00"}

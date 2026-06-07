@@ -4,14 +4,23 @@
 follower_port: /dev/ttyACM1
 leader_port: /dev/ttyACM0
 
-# Calibration ids (set during `lerobot-calibrate ... --robot.id=...`) — reuse everywhere
-follower_id: follower
-leader_id: leader
+# Calibration ids (set during `lerobot-calibrate ... --robot.id=...`) — reuse everywhere.
+# MUST match the id used when recording/calibrating, so the right calibration loads.
+follower_id: Follower
+leader_id: Leader
 
 # Camera config string passed to lerobot CLIs (--robot.cameras=...).
-# For the RGB-D scene camera, perception/realsense.py opens RealSense directly;
-# this opencv entry is the camera LeRobot records/rolls out with.
-camera_arg: "{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}}"
+# MUST be byte-identical to the cameras the policy was TRAINED with, or the policy
+# receives mismatched observations. This matches the two_pills_cups dataset:
+#   wrist = HBV USB cam (stable by-id path, MJPG) 640x480@15
+#   front = RealSense D405 (serial) 424x240@15
+camera_arg: "{wrist: {type: opencv, index_or_path: /dev/v4l/by-id/usb-HBV_HD_CAMERA_HBV_HD_CAMERA-video-index0, width: 640, height: 480, fps: 15, fourcc: MJPG}, front: {type: intelrealsense, serial_number_or_name: 218622275778, width: 424, height: 240, fps: 15}}"
+
+# Policy rollout settings (must match training).
+fps: 15                              # control rate; = dataset fps
+policy_device: cuda                  # cuda | cpu | mps
+policy_temporal_ensemble_coeff: 0.01 # ACT smoothing (avoids the jerky chunk boundaries)
+rollout_duration_s: 30              # seconds per run_policy call
 
 # Safe-stop: halt the arm if a tracked body part jumps more than this (metres) per frame.
 safe_stop_max_jump_m: 0.08
