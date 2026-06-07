@@ -461,11 +461,18 @@ def _ensure_ollama() -> None:
     except Exception:
         pass
     logger.info("Starting Ollama in the background...")
-    subprocess.Popen(  # noqa: S603
-        ["ollama", "serve"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
+    try:
+        subprocess.Popen(  # noqa: S603
+            ["ollama", "serve"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except FileNotFoundError:
+        logger.warning(
+            "Ollama is not installed; continuing without a local agent. Install it from "
+            "https://ollama.com or set AGENT_BACKEND=claude. Chat will be unavailable until then."
+        )
+        return
     for _ in range(20):
         time.sleep(0.5)
         try:
