@@ -187,8 +187,19 @@ class GoogleCalendarClient(CalendarClient):
             return result
         try:
             service = self._ensure_service()
-            calendar = service.calendarList().get(calendarId=self.calendar_id).execute()
-            result["account"] = calendar.get("id")
+            # Verify access through the Events API because SCOPES intentionally grants
+            # event access only. calendarList.get requires an additional calendar-list
+            # scope and would incorrectly mark a valid event token as unauthorized.
+            (
+                service.events()
+                .list(
+                    calendarId=self.calendar_id,
+                    maxResults=1,
+                    singleEvents=True,
+                )
+                .execute()
+            )
+            result["account"] = self.calendar_id
         except Exception as exc:  # noqa: BLE001 — status must never raise
             logger.warning("Calendar status check failed: %s", exc)
             result["authorized"] = False
