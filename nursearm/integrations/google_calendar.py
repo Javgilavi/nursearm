@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import itertools
 import logging
+import re
 from abc import ABC, abstractmethod
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -79,8 +81,31 @@ class FakeCalendarClient(CalendarClient):
         }
 
     def list_events(self, time_min: datetime, time_max: datetime) -> list[CalendarEvent]:
-        events = [e for e in self._events.values() if time_min <= e.start < time_max]
+        events: list[CalendarEvent] = []
+        for event in self._events.values():
+            if event.recurring:
+                events.extend(self._expand_daily(event, time_min, time_max))
+            elif time_min <= event.start < time_max:
+                events.append(event)
         return sorted(events, key=lambda e: e.start)
+
+    @staticmethod
+    def _expand_daily(
+        base: CalendarEvent, time_min: datetime, time_max: datetime
+    ) -> list[CalendarEvent]:
+        """One dated instance per day within the window, mirroring Google's singleEvents."""
+        duration = (base.end - base.start) if base.end else timedelta(minutes=5)
+        day = base.start
+        if day < time_min:  # fast-forward to the first instance inside the window
+            day += timedelta(days=(time_min - day).days)
+            while day < time_min:
+                day += timedelta(days=1)
+        instances: list[CalendarEvent] = []
+        while day < time_max:
+            instance_id = f"{base.id}_{day.astimezone().strftime('%Y%m%d')}"
+            instances.append(replace(base, id=instance_id, start=day, end=day + duration))
+            day += timedelta(days=1)
+        return instances
 
     def create_event(
         self,
@@ -105,6 +130,9 @@ class FakeCalendarClient(CalendarClient):
         return event
 
     def delete_event(self, event_id: str) -> None:
+        # An expanded daily instance ("base_YYYYMMDD") deletes the whole series.
+        base_id = re.sub(r"_\d{8}$", "", event_id)
+        self._events.pop(base_id, None)
         self._events.pop(event_id, None)
 
     @staticmethod

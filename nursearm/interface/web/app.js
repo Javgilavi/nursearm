@@ -663,7 +663,6 @@ async function pollPalmStatus() {
 const medConn = document.getElementById("med-conn");
 const medConnLabel = document.getElementById("med-conn-label");
 const medAutoToggle = document.getElementById("med-autopilot-toggle");
-const medConnect = document.getElementById("med-connect");
 const medList = document.getElementById("med-list");
 const medEmpty = document.getElementById("med-empty");
 const medAddForm = document.getElementById("med-add-form");
@@ -717,17 +716,14 @@ function renderConnection(connection) {
   if (backend === "fake") {
     medConn.classList.add("med-conn-demo");
     medConnLabel.textContent = "Demo";
-    medConnect.hidden = true;
     medConnected = true;
   } else if (ready) {
     medConn.classList.add("med-conn-online");
     medConnLabel.textContent = "Connected";
-    medConnect.hidden = true;
     medConnected = true;
   } else {
     medConn.classList.add("med-conn-offline");
     medConnLabel.textContent = "Offline";
-    medConnect.hidden = false;
     medConnected = false;
   }
   medAddBtn.disabled = !medConnected;
@@ -741,13 +737,21 @@ function renderAutoPilot(enabled) {
 }
 
 function eventActions(ev) {
+  const del = `<button type="button" class="med-mini-btn med-mini-del" data-del="${ev.id}" aria-label="Remove">×</button>`;
   if (ev.status === "due") {
     return (
       `<button type="button" class="med-mini-btn med-mini-run" data-fire="${ev.id}">Give</button>` +
       `<button type="button" class="med-mini-btn" data-skip="${ev.id}">Skip</button>`
     );
   }
-  return `<button type="button" class="med-mini-btn med-mini-del" data-del="${ev.id}" aria-label="Remove">×</button>`;
+  // Upcoming or missed pills can be run ahead of time ("anticipate") from the UI.
+  if (ev.status === "scheduled" || ev.status === "missed") {
+    return (
+      `<button type="button" class="med-mini-btn" data-fire="${ev.id}" title="Run this pill now, ahead of schedule">Give now</button>` +
+      del
+    );
+  }
+  return del;
 }
 
 function renderEvents(events) {

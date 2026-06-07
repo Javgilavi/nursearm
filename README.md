@@ -302,6 +302,30 @@ A background watcher in the server polls the calendar, resolves each event to a 
 and fires the mapped skill once. Firing is serialized with the rest of the robot through a
 shared lock, so a scheduled pill never stacks a rollout on top of a live movement.
 
+### Launching
+
+There is **no separate command** — the medication scheduler starts inside `nursearm-serve`
+alongside the UI. The same command you already use to launch NurseArm also launches the
+calendar:
+
+```bash
+uv run nursearm-serve
+```
+
+Open `http://127.0.0.1:8000`; the **Today's medication** card is at the top of the left
+rail. Which calendar it reads depends only on how the server is started:
+
+| How you start the server | Calendar backend | Card chip |
+|---|---|---|
+| `NURSEARM_MOCK=1 uv run nursearm-serve` | offline demo (seeded sample pills) | **Demo** |
+| `uv run nursearm-serve` (full hardware, `NURSEARM_MOCK=0`) | your real Google Calendar | **Connected** once authorized |
+| `NURSEARM_MOCK=1 NURSEARM_CALENDAR_REAL=1 uv run nursearm-serve` | real Google Calendar, mocked robot | **Connected** once authorized |
+
+The scheduler always starts; if the real calendar is not authorized yet the card simply
+shows **Offline** and the rest of NurseArm runs normally. To connect the real calendar, do
+the one-time setup in [Connect A Real Google Calendar](#connect-a-real-google-calendar) —
+after that, the same `uv run nursearm-serve` picks it up automatically on every launch.
+
 ### Triggers And Timing
 
 Triggers live in [config/calendar.yaml](config/calendar.yaml). Each trigger maps a calendar
@@ -338,6 +362,15 @@ resets the next day for daily medications.
 In the browser, the **Today's medication** card at the top of the status rail shows the
 connection state, the Auto-pilot switch, today's pill timeline, and an **Add pill** form. A
 global banner appears when a pill is due. On phones the schedule has its own bottom-bar tab.
+
+**Anticipate a pill:** any upcoming (or missed) pill has a **Give now** button on its row —
+press it to run that pill immediately, ahead of its scheduled time. A due pill instead shows
+**Give** / **Skip**, and the `×` removes an event entirely.
+
+**Daily medications:** tick **Repeat daily** in the Add form (or ask the agent to repeat
+daily) to create a recurring event. Each day's instance is tracked separately, so it fires
+once per day and the per-day state resets automatically. Daily events expand into one dated
+instance per day in both the real Google backend and the offline demo.
 
 ### Demo Mode (No Calendar Required)
 

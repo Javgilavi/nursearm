@@ -38,6 +38,32 @@ def test_fake_create_then_listed_then_delete() -> None:
     assert client.list_events(BASE, BASE + timedelta(hours=1)) == []
 
 
+def test_fake_daily_event_expands_into_per_day_instances() -> None:
+    client = FakeCalendarClient(events=[])
+    client.create_event("Green pill", BASE + timedelta(minutes=30), color_id="10", daily=True)
+
+    listed = client.list_events(BASE, BASE + timedelta(days=3))
+
+    assert len(listed) == 3  # one instance per day in the window
+    assert {e.start for e in listed} == {
+        BASE + timedelta(minutes=30),
+        BASE + timedelta(days=1, minutes=30),
+        BASE + timedelta(days=2, minutes=30),
+    }
+    assert len({e.id for e in listed}) == 3  # distinct, stable per-day ids
+    assert all(e.recurring for e in listed)
+
+
+def test_fake_delete_daily_series_removes_all_instances() -> None:
+    client = FakeCalendarClient(events=[])
+    client.create_event("Green pill", BASE + timedelta(minutes=30), color_id="10", daily=True)
+    listed = client.list_events(BASE, BASE + timedelta(days=3))
+
+    client.delete_event(listed[0].id)  # deleting any instance removes the whole series
+
+    assert client.list_events(BASE, BASE + timedelta(days=3)) == []
+
+
 def test_google_status_unconfigured_when_no_credentials(tmp_path: Path) -> None:
     client = GoogleCalendarClient(
         calendar_id="primary",
