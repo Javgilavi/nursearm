@@ -1,0 +1,54 @@
+# Medication-schedule watcher configuration.
+#
+# A Google Calendar event whose COLOR swatch or TITLE keyword matches a trigger below
+# auto-fires the mapped robot skill at the event's start time. See
+# docs/superpowers/specs/2026-06-07-calendar-medication-schedule-design.md.
+
+# How often the watcher polls Google Calendar, in seconds.
+poll_interval_s: 30
+
+# Do NOT auto-fire an event that became due more than this many minutes ago. Protects
+# against a flood of "missed" firings after the server was offline.
+grace_min: 5
+
+# Cancel window (seconds) shown in the UI banner before a due event auto-runs.
+countdown_s: 15
+
+# Default Auto-pilot state. When off, due events only notify (Run / Skip), never auto-run.
+# The UI toggle overrides this at runtime.
+auto_pilot: true
+
+# Which Google calendar to read. "primary" is the signed-in user's main calendar.
+calendar_id: primary
+
+# How far ahead (hours) the panel lists upcoming events.
+lookahead_hours: 24
+
+# Trigger table. Order = precedence; the first trigger that matches an event wins.
+# An event matches a trigger if its Google colorId is in `color_ids` OR any of
+# `keywords` is a case-insensitive substring of the event title.
+#
+# Google colorId reference: 2=Sage, 10=Basil (greens), 8=Graphite (gray/"black"),
+# 11=Tomato (red), 5=Banana (yellow). Google has no true black swatch.
+triggers:
+  green:
+    color_ids: ["10", "2"]
+    keywords: ["green"]
+    skill: handover_pill
+    args: {color: green}
+    label: "Green pill"
+    color_hex: "#0b8043"
+  black:
+    color_ids: ["8"]
+    keywords: ["black"]
+    skill: handover_pill
+    args: {color: black}
+    label: "Black pill"
+    color_hex: "#3c4043"
+  sort:
+    color_ids: []
+    keywords: ["sort"]
+    skill: sort_pills
+    args: {}
+    label: "Sort pills"
+    color_hex: "#b8860b"

@@ -28,6 +28,13 @@ dependencies = [
 robot = [
     "pyrealsense2>=2.55",
 ]
+# Google Calendar integration for the medication scheduler. Optional: without it the
+# scheduler runs against an in-memory fake calendar (mock mode / no credentials).
+calendar = [
+    "google-api-python-client>=2.100",
+    "google-auth-oauthlib>=1.2",
+    "google-auth-httplib2>=0.2",
+]
 dev = [
     "ruff>=0.6",
     "pytest>=8.0",
@@ -37,6 +44,7 @@ dev = [
 nursearm-serve = "nursearm.interface.server:main"
 nursearm-mcp = "nursearm.mcp.server:main"
 nursearm-mcp-client = "nursearm.mcp.client:main"
+nursearm-calendar-auth = "nursearm.integrations.calendar_auth:main"
 
 [build-system]
 requires = ["setuptools>=68"]

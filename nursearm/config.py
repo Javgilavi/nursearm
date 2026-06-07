@@ -29,6 +29,11 @@ def skills_config() -> dict[str, Any]:
     return _load(CONFIG_DIR / "skills.yaml")
 
 
+@lru_cache
+def calendar_config() -> dict[str, Any]:
+    return _load(CONFIG_DIR / "calendar.yaml")
+
+
 def env(key: str, default: str | None = None, *, required: bool = False) -> str | None:
     value = os.getenv(key, default)
     if required and not value:
