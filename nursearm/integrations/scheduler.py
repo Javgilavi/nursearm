@@ -250,6 +250,17 @@ class PillScheduler:
 
     # -- views -------------------------------------------------------------------
 
+    @property
+    def triggers(self) -> dict[str, Trigger]:
+        return self._triggers
+
+    def trigger_options(self) -> list[dict[str, Any]]:
+        """Trigger choices for the UI "Add" form."""
+        return [
+            {"key": t.key, "label": t.label, "color_hex": t.color_hex}
+            for t in self._triggers.values()
+        ]
+
     def status(self) -> dict[str, Any]:
         info = self._calendar.status()
         info["auto_pilot"] = self.auto_pilot

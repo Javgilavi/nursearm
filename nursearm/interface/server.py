@@ -25,6 +25,7 @@ import subprocess
 import tempfile
 import time
 from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
@@ -38,6 +39,9 @@ if TYPE_CHECKING:
     from faster_whisper import WhisperModel
 
 from nursearm.audit.log import AuditLog
+from nursearm.config import calendar_config
+from nursearm.integrations.google_calendar import CalendarUnavailableError, build_client
+from nursearm.integrations.scheduler import PillScheduler
 from nursearm.mcp.client import NurseArmMCPClient
 from nursearm.orchestrator.claude_agent import ClaudeMCPAgent, ClaudeUnavailableError
 from nursearm.orchestrator.ollama_agent import OllamaMCPAgent, OllamaUnavailableError
@@ -57,6 +61,8 @@ class _NoiseFilter(logging.Filter):
         "GET /palm/status ",
         "GET /health ",
         "GET /qr.svg",
+        "GET /calendar/schedule ",
+        "GET /calendar/status ",
     )
 
     def filter(self, record: logging.LogRecord) -> bool:
@@ -72,6 +78,7 @@ logger = logging.getLogger(__name__)
 MOCK = os.getenv("NURSEARM_MOCK", "0") == "1"
 WHISPER_MODEL = os.getenv("WHISPER_MODEL", "small")
 WEB_DIR = Path(__file__).resolve().parent / "web"
+DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 CAMERA2_INDEX = int(os.getenv("NURSEARM_CAMERA2_INDEX", "2"))
 
 _JPEG_PARAMS = [cv2.IMWRITE_JPEG_QUALITY, 75]
@@ -91,6 +98,20 @@ class AppState:
         self.perception = Perception(mock=MOCK)
         self.skills = SkillRegistry()
         self.mcp = NurseArmMCPClient()
+        # Serializes UI/handover/scheduled movements through this process so the
+        # medication scheduler never stacks a rollout on top of a live one.
+        self._robot_lock = asyncio.Lock()
+        self.calendar = build_client(
+            mock=MOCK, calendar_id=calendar_config().get("calendar_id", "primary")
+        )
+        self.scheduler = PillScheduler(
+            calendar=self.calendar,
+            config=calendar_config(),
+            runner=self._run_scheduled_skill,
+            robot_busy=lambda: self._robot_lock.locked(),
+            state_path=DATA_DIR / "calendar_state.json",
+            audit=self.audit,
+        )
         self.agent: OllamaMCPAgent | ClaudeMCPAgent | None = None
         self.loop: asyncio.AbstractEventLoop | None = None
         self._ws_clients: set[WebSocket] = set()
@@ -121,8 +142,11 @@ class AppState:
         self._cam2_task = asyncio.create_task(self._camera2_loop())
         self._robot_task = asyncio.create_task(self._robot_poll_loop())
         asyncio.create_task(self._preload_whisper())
+        self.scheduler.start()
+        logger.info("Medication scheduler started (calendar=%s).", self.scheduler.status().get("backend"))
 
     async def close(self) -> None:
+        await self.scheduler.stop()
         if self._camera_task is not None:
             self._camera_task.cancel()
         if self._cam2_task is not None:
@@ -138,32 +162,73 @@ class AppState:
         self.robot.disconnect()
         self.perception.close()
 
-    async def run_handover(self, arguments: dict[str, Any]) -> dict[str, Any]:
-        """Release UI camera handles, run ACT, then restore the live streams."""
-        camera_tasks = [task for task in (self._camera_task, self._cam2_task) if task is not None]
-        for task in camera_tasks:
-            task.cancel()
-        if camera_tasks:
-            await asyncio.gather(*camera_tasks, return_exceptions=True)
-        self._camera_task = None
-        self._cam2_task = None
-        if self._cam2_capture is not None:
-            self._cam2_capture.release()
-            self._cam2_capture = None
-        self.perception.close()
+    async def _run_skill_with_cameras(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        """Release UI camera handles, run an ACT skill, then restore the live streams.
 
+        Serialized by ``self._robot_lock`` so the UI, direct endpoints, and the
+        medication scheduler never run two rollouts at once.
+        """
+        async with self._robot_lock:
+            camera_tasks = [t for t in (self._camera_task, self._cam2_task) if t is not None]
+            for task in camera_tasks:
+                task.cancel()
+            if camera_tasks:
+                await asyncio.gather(*camera_tasks, return_exceptions=True)
+            self._camera_task = None
+            self._cam2_task = None
+            if self._cam2_capture is not None:
+                self._cam2_capture.release()
+                self._cam2_capture = None
+            self.perception.close()
+
+            try:
+                result = await asyncio.to_thread(
+                    self.skills.run,
+                    name,
+                    arguments,
+                    self.robot,
+                    self.perception,
+                )
+                return result.summary()
+            finally:
+                self._camera_task = asyncio.create_task(self._camera_loop())
+                self._cam2_task = asyncio.create_task(self._camera2_loop())
+
+    async def run_handover(self, arguments: dict[str, Any]) -> dict[str, Any]:
+        """Run the handover ACT skill with the camera-release dance."""
+        return await self._run_skill_with_cameras("handover_pill", arguments)
+
+    async def _run_scheduled_skill(self, skill: str, args: dict[str, Any]) -> dict[str, Any]:
+        """Runner the medication scheduler calls when a labelled event becomes due."""
+        return await self._run_skill_with_cameras(skill, args)
+
+    # -- calendar event management ----------------------------------------------
+
+    async def create_calendar_event(
+        self, trigger_key: str, start_iso: str, daily: bool
+    ) -> dict[str, Any]:
+        trigger = self.scheduler.triggers.get(trigger_key)
+        if trigger is None:
+            raise ValueError(f"unknown trigger {trigger_key!r}")
         try:
-            result = await asyncio.to_thread(
-                self.skills.run,
-                "handover_pill",
-                arguments,
-                self.robot,
-                self.perception,
-            )
-            return result.summary()
-        finally:
-            self._camera_task = asyncio.create_task(self._camera_loop())
-            self._cam2_task = asyncio.create_task(self._camera2_loop())
+            start = datetime.fromisoformat(start_iso)
+        except ValueError as exc:
+            raise ValueError(f"invalid start time {start_iso!r}") from exc
+        if start.tzinfo is None:
+            start = start.astimezone()  # interpret a bare datetime as local time
+        color_id = trigger.color_ids[0] if trigger.color_ids else None
+        event = await asyncio.to_thread(
+            self.calendar.create_event, trigger.label, start, color_id=color_id, daily=daily
+        )
+        await self.scheduler.poll()
+        return {"ok": True, "id": event.id, "label": trigger.label, "start_iso": event.start.isoformat()}
+
+    async def delete_calendar_event(self, event_id: str) -> dict[str, Any]:
+        await asyncio.to_thread(self.calendar.delete_event, event_id)
+        self.scheduler.fired.discard(event_id)
+        self.scheduler.skipped.discard(event_id)
+        await self.scheduler.poll()
+        return {"ok": True, "id": event_id}
 
     # -- camera background task --------------------------------------------------
 
@@ -654,6 +719,69 @@ async def run_handover_pill(request: HandoverRequest) -> dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     logger.info("Direct handover completed: color=%s", request.color)
     return result
+
+
+# -- calendar / medication schedule ---------------------------------------------
+
+
+@app.get("/calendar/status")
+async def calendar_status() -> dict[str, Any]:
+    """Connection + Auto-pilot state for the schedule panel header."""
+    return state.scheduler.status()
+
+
+@app.get("/calendar/schedule")
+async def calendar_schedule() -> dict[str, Any]:
+    """Upcoming pill events, their status, and the current due/pending firing."""
+    payload = state.scheduler.schedule_payload()
+    payload["triggers"] = state.scheduler.trigger_options()
+    return payload
+
+
+class AutoPilotIn(BaseModel):
+    enabled: bool
+
+
+@app.post("/calendar/auto-pilot")
+async def calendar_auto_pilot(body: AutoPilotIn) -> dict[str, Any]:
+    state.scheduler.set_auto_pilot(body.enabled)
+    return {"ok": True, "auto_pilot": body.enabled}
+
+
+class NewEventIn(BaseModel):
+    trigger: str            # green | black | sort (a key from calendar.yaml)
+    start_iso: str          # ISO datetime; bare datetimes are treated as local time
+    daily: bool = False
+
+
+@app.post("/calendar/events")
+async def calendar_create_event(body: NewEventIn) -> dict[str, Any]:
+    try:
+        return await state.create_calendar_event(body.trigger, body.start_iso, body.daily)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except CalendarUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.delete("/calendar/events/{event_id}")
+async def calendar_delete_event(event_id: str) -> dict[str, Any]:
+    try:
+        return await state.delete_calendar_event(event_id)
+    except CalendarUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.post("/calendar/fire/{event_id}")
+async def calendar_fire_event(event_id: str) -> dict[str, Any]:
+    """Run a scheduled pill now, skipping the countdown (the banner's "Run now")."""
+    return await state.scheduler.fire_now(event_id)
+
+
+@app.post("/calendar/skip/{event_id}")
+async def calendar_skip_event(event_id: str) -> dict[str, Any]:
+    """Dismiss a due/pending pill so it never fires (the banner's "Skip")."""
+    return state.scheduler.skip(event_id)
 
 
 @app.websocket("/audit")
